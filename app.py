@@ -26,6 +26,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 import manifest as manifest_lib
 import media_library
+import printer_client
 import store as store_lib
 from espuino_client import delete_rfid_on_device
 
@@ -114,6 +115,13 @@ def _inject_auth_state():
     return {"hub_password_set": bool(store.get_settings().get("password_hash"))}
 
 
+@app.context_processor
+def _inject_printer():
+    """The print shop's URL, read at render time so there is one source for it
+    (`printer_client.BASE_URL`, which is also where its calls go)."""
+    return {"printer_url": printer_client.BASE_URL}
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     password_hash = store.get_settings().get("password_hash")
@@ -141,18 +149,23 @@ def logout():
 def index():
     cards = store.list_cards()
     devices = store.list_devices()
+    print_project_count = len(store.list_print_projects())
     pending_count = sum(1 for c in cards.values() if c["status"] == "pending")
     assigned_count = sum(1 for c in cards.values() if c["status"] == "assigned")
     total_bytes = sum(
         f["size"] for c in cards.values() if c["kind"] == "files" for f in c.get("files", [])
     )
     device_label = ngettext("%(num)s device", "%(num)s devices", len(devices)) % {"num": len(devices)}
+    print_project_label = ngettext("%(num)s project", "%(num)s projects", print_project_count) % {
+        "num": print_project_count
+    }
     return render_template(
         "index.html",
         device_label=device_label,
         pending_count=pending_count,
         assigned_count=assigned_count,
         total_bytes=total_bytes,
+        print_project_label=print_project_label,
     )
 
 
@@ -317,18 +330,23 @@ def cards():
     esp_id_filter = request.args.get("esp_id") or ""
     cards_by_key = store.list_cards()
     devices_by_id = store.list_devices()
+    # The row carries the card's *identity* (the store key's second half), not
+    # `card.card_id`: a card ordered from the print shop has no UID yet, and every
+    # link below has to address it the way the store and the URL space do.
     rows = [
         (
+            store_lib.split_card_key(key, c),
             c,
             _content_label(c),
             _content_detail(c),
             devices_by_id.get(c["esp_id"], {}).get("alias") or c["esp_id"],
         )
-        for c in cards_by_key.values()
+        for key, c in cards_by_key.items()
         if (not only_pending or c["status"] == "pending")
         and (not esp_id_filter or c["esp_id"] == esp_id_filter)
     ]
-    rows.sort(key=lambda row: row[0]["last_seen"], reverse=True)
+    # row[0] is the identity, row[1] the record itself.
+    rows.sort(key=lambda row: row[1]["last_seen"], reverse=True)
     return render_template(
         "cards.html",
         cards=rows,
@@ -392,6 +410,7 @@ def duplicate_card(esp_id, card_id):
         source["stream_url"],
         source["files"],
         source.get("play_root", ""),
+        source.get("print"),
     )
     flash(_("Card %(id)s duplicated to %(esp_id)s.", id=card_id, esp_id=target_esp_id), "success")
     return redirect(url_for("cards"))
@@ -401,7 +420,9 @@ def duplicate_card(esp_id, card_id):
 def assign_card(esp_id, card_id):
     card = store.get_card(esp_id, card_id) or {
         "esp_id": esp_id,
-        "card_id": card_id,
+        # A card ordered from the print shop has no UID yet and is addressed by a
+        # hub token instead — which is not a card id and must not be shown as one.
+        "card_id": card_id if manifest_lib.is_valid_card_id(card_id) else None,
         "status": "pending",
         "name": "",
         "kind": "files",
@@ -492,7 +513,11 @@ def assign_card(esp_id, card_id):
         # keep their own play positions and caches.
         targets = _assignment_targets(esp_id)
         for target_esp_id in targets:
-            store.save_assignment(target_esp_id, card_id, *payload)
+            # A card the hub ordered printed carries its print order to every device
+            # it is written to: that reference is what `promote_print_card` finds the
+            # card by once the printer reports the UID. A card a device reported has
+            # none, and then nothing is passed.
+            store.save_assignment(target_esp_id, card_id, *payload, print_ref=card.get("print"))
 
         if len(targets) == 1:
             flash(_("Card %(id)s assigned.", id=card_id), "success")
@@ -540,7 +565,14 @@ def delete_card(esp_id, card_id):
         abort(404)
 
     delete_mode = store.get_settings()["delete_mode"]
-    if delete_mode == "secure" and card["status"] == "assigned":
+    # Secure delete calls the ESPuino with this id. A card that has no UID yet is
+    # keyed by a hub token, which means nothing to a device — and the card is not
+    # on any device in the first place.
+    if (
+        delete_mode == "secure"
+        and card["status"] == "assigned"
+        and manifest_lib.is_valid_card_id(card_id)
+    ):
         # The assignment already names its one ESPuino — no more guessing
         # from whichever device last happened to tap the card.
         device = store.list_devices().get(esp_id)
@@ -571,10 +603,144 @@ def manifest_preview(esp_id, card_id):
     card — same builder as card_manifest(), but without its side effects
     (no device/card "last seen" tracking, no pending-registration)."""
     card = store.get_card(esp_id, card_id)
-    if card is None or card["status"] != "assigned":
+    # A card without a UID has no manifest to preview either: the manifest is built
+    # from a card id, and there is none until the card is printed.
+    if card is None or card["status"] != "assigned" or not manifest_lib.is_valid_card_id(card_id):
         abort(404)
     files_base_url = url_for("serve_media", filename="", _external=True)
     return jsonify(manifest_lib.build_manifest(card_id, card, files_base_url))
+
+
+# --------------------------------------------------------------------------
+# Web UI: print projects (orders at the card-printing service)
+# --------------------------------------------------------------------------
+@app.route("/print")
+def print_projects():
+    projects = store.list_print_projects()
+    rows = [
+        (token, project, store.count_cards_for_print_project(token))
+        for token, project in projects.items()
+    ]
+    rows.sort(key=lambda row: row[1]["created_at"], reverse=True)
+    return render_template("print_projects.html", projects=rows)
+
+
+def _read_order_into(token, project):
+    """Asks the print shop about this project's order and stores what it says.
+
+    Returns the error to show the admin, or None when the shop answered. The status
+    is the shop's own vocabulary and is never interpreted here.
+
+    `token` is passed alongside the record because the record does not carry its own
+    key — the store keys projects by it, and a second copy could disagree with it.
+    """
+    try:
+        order = printer_client.get_order(project["prefix"])
+    except printer_client.PrinterError as exc:
+        return str(exc)
+    store.set_print_project_status(token, order.get("status"))
+    return None
+
+
+@app.route("/print/new", methods=["POST"])
+def create_print_project():
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash(_("Please give the print project a name."), "error")
+        return redirect(url_for("print_projects"))
+
+    project = store.create_print_project(name)
+    flash(_("Print project %(name)s created.", name=name), "success")
+    # The order is placed right away, so the customer has something to open and pay
+    # for. A shop that is down does not lose the project: it stays here, unlinked,
+    # and "Check order" places it later — the uuid is already minted either way.
+    try:
+        order = printer_client.ensure_order(project["prefix"])
+    except printer_client.PrinterError as exc:
+        flash(
+            _("The print shop did not take the order: %(error)s", error=str(exc)),
+            "error",
+        )
+    else:
+        store.set_print_project_status(project["token"], order.get("status"))
+    return redirect(url_for("print_project", token=project["token"]))
+
+
+@app.route("/print/<token>/sync", methods=["POST"])
+def sync_print_project(token):
+    """Re-reads the order at the print shop: its status, and — once cards exist —
+    the UIDs the print process has filled in. The (only) trigger is the button on the
+    project page: nothing polls the shop, and nothing here runs on a device's path."""
+    project = store.get_print_project(token)
+    if project is None:
+        abort(404)
+    error = _read_order_into(token, project)
+    if error:
+        flash(_("The print shop could not be read: %(error)s", error=error), "error")
+    else:
+        status = (store.get_print_project(token) or {}).get("status") or ""
+        flash(_("Order at the print shop: %(status)s", status=status), "success")
+    return redirect(url_for("print_project", token=token))
+
+
+@app.route("/print/<token>")
+def print_project(token):
+    project = store.get_print_project(token)
+    if project is None:
+        abort(404)
+
+    devices_by_id = store.list_devices()
+    # One printed card is one hub card per device, so they are grouped by the card
+    # they become at the shop — that grouping is also what the print sync works
+    # per card, and what tells the admin whether a card is printed yet.
+    groups = {}
+    for key, card in store.list_cards().items():
+        ref = card.get("print") or {}
+        if ref.get("token") != token:
+            continue
+        group = groups.setdefault(
+            ref.get("id"),
+            {"id": ref.get("id"), "promoted_at": ref.get("promoted_at"), "cards": []},
+        )
+        group["cards"].append(
+            (
+                store_lib.split_card_key(key, card),
+                card,
+                devices_by_id.get(card["esp_id"], {}).get("alias") or card["esp_id"],
+            )
+        )
+    for group in groups.values():
+        group["cards"].sort(key=lambda row: row[2].lower())
+    ordered = [groups[shop_id] for shop_id in sorted(groups, key=lambda i: (i is None, i))]
+    return render_template(
+        "print_project.html",
+        token=token,
+        project=project,
+        groups=ordered,
+        card_count=store.count_cards_for_print_project(token),
+    )
+
+
+@app.route("/print/<token>/delete", methods=["POST"])
+def delete_print_project(token):
+    if store.get_print_project(token) is None:
+        abort(404)
+    # Deliberately no cascade: these are live cards at the shop.
+    count = store.count_cards_for_print_project(token)
+    if count:
+        flash(
+            ngettext(
+                "This print project still has %(num)s card — delete it first.",
+                "This print project still has %(num)s cards — delete them first.",
+                count,
+            )
+            % {"num": count},
+            "error",
+        )
+        return redirect(url_for("print_project", token=token))
+    store.delete_print_project(token)
+    flash(_("Print project deleted."), "success")
+    return redirect(url_for("print_projects"))
 
 
 # --------------------------------------------------------------------------
@@ -586,14 +752,16 @@ def media_overview():
     devices_by_id = store.list_devices()
     rows = [
         (
+            store_lib.split_card_key(key, c),
             c,
             sum(f["size"] for f in c.get("files", [])),
             devices_by_id.get(c["esp_id"], {}).get("alias") or c["esp_id"],
         )
-        for c in cards_by_key.values()
+        for key, c in cards_by_key.items()
         if c["kind"] == "files" and c.get("files")
     ]
-    rows.sort(key=lambda row: row[1], reverse=True)
+    # row[0] is the identity, row[1] the record, row[2] the total size.
+    rows.sort(key=lambda row: row[2], reverse=True)
     return render_template("media.html", rows=rows)
 
 
@@ -677,6 +845,13 @@ def remove_password():
 # --------------------------------------------------------------------------
 @app.route("/<esp_id>/card/<card_id>/manifest.json")
 def card_manifest(esp_id, card_id):
+    # A card the hub ordered printed has no UID yet and is keyed by a hub token
+    # instead, which no device ever sends. Answering such a request would hand out
+    # a manifest whose cardId is that token, and registering it would invent a
+    # device/card pair nothing can ever tap.
+    if not manifest_lib.is_valid_card_id(card_id):
+        return jsonify(error="unknown_card", status="pending"), 404
+
     ts = store_lib.now_iso()
     store.touch_device(esp_id, request.remote_addr, card_id, ts)
 

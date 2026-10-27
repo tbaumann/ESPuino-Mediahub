@@ -50,6 +50,18 @@ in {
         when the ESPuinos must reach it through the host firewall.
       '';
     };
+    printerUrl = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        URL of the card-printing service (ESPuino label-printer) this hub places
+        print orders at. It is used both for the hub's own API calls and for the
+        link a customer follows to pay, so it must be reachable from this host
+        *and* from the browser — a host/IP:port, not a container or service name.
+        Unset means the print-shop integration is off.
+      '';
+      example = "http://printer.local:8081";
+    };
     gunicornArgs = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [
@@ -108,7 +120,10 @@ in {
           # control socket lands there instead of $HOME/.gunicorn (read-only
           # under ProtectSystem=strict).
           "XDG_RUNTIME_DIR=/run/espuino-mediahub"
-        ];
+        ]
+        # Only when set: an empty MEDIAHUB_PRINTER_URL and an absent one mean the
+        # same thing, and leaving it out keeps the unit honest about that.
+        ++ lib.optional (cfg.printerUrl != null) "MEDIAHUB_PRINTER_URL=${cfg.printerUrl}";
         ExecStart =
           "${cfg.package}/bin/espuino-mediahub --bind 0.0.0.0:${toString cfg.port} "
           + lib.concatStringsSep " " cfg.gunicornArgs;

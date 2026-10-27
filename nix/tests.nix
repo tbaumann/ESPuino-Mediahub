@@ -97,19 +97,25 @@
       "ProcSubset=pid"
       "UMask=0077"
       "CapabilityBoundingSet="
-    ] [] (unitText sys);
+    ] [
+      # Unset by default, and then it is not in the unit at all — an empty
+      # MEDIAHUB_PRINTER_URL and an absent one mean the same thing.
+      "MEDIAHUB_PRINTER_URL"
+    ] (unitText sys);
 
     eval-overrides = let
       sys' = mkSystem {
         services.espuino-mediahub.enable = true;
         services.espuino-mediahub.port = 9090;
         services.espuino-mediahub.mediaDir = "/mnt/audiobooks";
+        services.espuino-mediahub.printerUrl = "http://printer.local:8081";
         services.espuino-mediahub.gunicornArgs = ["--workers 4" "--timeout 300"];
       };
     in
       grepCheck "overrides" [
         "--bind 0.0.0.0:9090"
         "Environment=MEDIAHUB_MEDIA=/mnt/audiobooks"
+        "Environment=MEDIAHUB_PRINTER_URL=http://printer.local:8081"
         "--workers 4"
         "--timeout 300"
       ] [] (unitText sys');

@@ -44,7 +44,7 @@ in
       runHook preInstall
       mkdir -p $out/share/espuino-mediahub
       cp -r \
-        app.py espuino_client.py manifest.py media_library.py store.py \
+        app.py espuino_client.py manifest.py media_library.py printer_client.py store.py \
         templates static translations babel.cfg messages.pot \
         $out/share/espuino-mediahub/
       mkdir -p $out/bin
