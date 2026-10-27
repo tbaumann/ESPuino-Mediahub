@@ -50,7 +50,7 @@
 		<span class="form-label">{{ _('Cover') }}</span>
 		<p class="muted">{{ _('The image the card is printed with. Without an upload it comes from the media: an image beside the files (cover.jpg, folder.png, …) or the artwork inside one of them.') }}</p>
 		<input type="file" id="cover" name="cover" accept="image/png,image/jpeg,image/webp,image/gif">
-		<div id="cover-preview" class="cover-preview"
+		<div id="cover-preview" class="cover-preview" data-state="empty"
 			data-cover-url="{{ url_for('print_card_cover', token=token) }}"
 			data-empty="{{ _('Select files to see the cover they would be printed with.') }}"
 			data-none="{{ _('No cover found for this selection — upload an image.') }}"

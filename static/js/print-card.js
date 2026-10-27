@@ -23,7 +23,11 @@
 	var sequence = 0;
 	var debounceTimer = undefined;
 
-	function render(imageUrl, note) {
+	// The state goes on the box as well as into the text: the one state that stops
+	// the card from existing (no cover anywhere) has to look like something to act
+	// on, and a caption alone does not.
+	function render(imageUrl, note, state) {
+		box.dataset.state = state;
 		box.innerHTML = "";
 		if (imageUrl) {
 			var img = document.createElement("img");
@@ -49,7 +53,7 @@
 			return false;
 		}
 		replaceUrl(URL.createObjectURL(upload.files[0]));
-		render(currentUrl, box.dataset.upload);
+		render(currentUrl, box.dataset.upload, "upload");
 		return true;
 	}
 
@@ -57,7 +61,7 @@
 		var raw = pathsInput ? pathsInput.value : "";
 		if (!raw || raw === "[]") {
 			replaceUrl(null);
-			render(null, box.dataset.empty);
+			render(null, box.dataset.empty, "empty");
 			return;
 		}
 		var mine = ++sequence;
@@ -73,7 +77,7 @@
 			}
 			if (!response.ok) {
 				replaceUrl(null);
-				render(null, box.dataset.none);
+				render(null, box.dataset.none, "none");
 				return null;
 			}
 			return response.blob();
@@ -82,11 +86,11 @@
 				return;
 			}
 			replaceUrl(URL.createObjectURL(blob));
-			render(currentUrl, box.dataset.media);
+			render(currentUrl, box.dataset.media, "media");
 		}).catch(function () {
 			if (mine === sequence) {
 				replaceUrl(null);
-				render(null, box.dataset.none);
+				render(null, box.dataset.none, "none");
 			}
 		});
 	}

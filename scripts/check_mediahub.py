@@ -490,6 +490,8 @@ check("...with exactly one media picker",
       r.data.count(b'id="media-tree"') == 1 and r.data.count(b'id="selected-paths-json"') == 1)
 check("...whose browser labels are valid JSON", labels_json(r.data) is not None)
 check("...and it asks for the cover", b'name="cover"' in r.data)
+check("...with the preview script", b"js/print-card.js" in r.data)
+check("...and a preview box the script can style per state", b'data-state="empty"' in r.data)
 
 r = client.post(
     f"/print/{shop_token}/card/cover", data={"selected_paths_json": json.dumps(["Printed/01.mp3"])}
