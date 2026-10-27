@@ -91,7 +91,7 @@
 						{% if card.card_id %}
 							<code>{{ card.card_id }}</code>
 						{% else %}
-							<span class="badge badge-attention">{{ _('in print') }}</span>
+							<span class="badge badge-attention">{{ _('to print') }}</span>
 						{% endif %}
 					</td>
 					<td><a href="{{ url_for('cards', esp_id=card.esp_id, pending=1 if only_pending else None) }}">{{ device_label }}</a></td>

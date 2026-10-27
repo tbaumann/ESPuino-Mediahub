@@ -111,7 +111,7 @@ import store as store_lib  # noqa: E402
 store = mediahub.store
 client = mediahub.app.test_client()
 # The hub renders in the browser's language (German by default), so pin English
-# before asserting on any text — including the "in print" badge below.
+# before asserting on any text — including the "to print" badge below.
 client.get("/lang/en")
 
 FAILED = []
@@ -274,7 +274,7 @@ check("virtual record has no card_id", raw[f"esp-a/{TOKEN}"]["card_id"] is None)
 check("virtual record carries the print ref", raw[f"esp-a/{TOKEN}"]["print"]["prefix"] == PRINT_REF["prefix"])
 
 r = client.get("/cards")
-check("card list renders the virtual card", r.status_code == 200 and b"in print" in r.data)
+check("card list renders the virtual card", r.status_code == 200 and b"to print" in r.data)
 check("the virtual row links by identity",
       f'/cards/esp-a/{TOKEN}/assign'.encode() in r.data)
 check("no manifest button on a virtual card",
@@ -414,7 +414,7 @@ check("a second project gets its own token and order", second != token
 REF4 = {"token": token, "prefix": project["prefix"], "id": 1, "ribbon": None}
 store.register_print_card("esp-a", "pending-1234abcd", REF4, ts)
 r = client.get(f"/print/{token}")
-check("the project page lists its card", b"#1" in r.data and b"in print" in r.data)
+check("the project page lists its card", b"#1" in r.data and b"to print" in r.data)
 check("...with the device it is on", b"esp-a" in r.data)
 check("...as well-formed rows", r.data.count(b"<tr") == r.data.count(b"</tr>"))
 r = client.get("/print")
@@ -548,7 +548,7 @@ check("...carrying the print order", record["print"]["prefix"] == shop_project["
 check("the project counts both records", store.count_cards_for_print_project(shop_token) == 2)
 check("and its card counter moved on", store.get_print_project(shop_token)["next_shop_card_id"] == 2)
 r = client.get(f"/print/{shop_token}")
-check("the project page lists the card as in print", b"#1" in r.data and b"in print" in r.data)
+check("the project page lists the card as to print", b"#1" in r.data and b"to print" in r.data)
 
 r = client.post(
     f"/print/{shop_token}/card/new",
