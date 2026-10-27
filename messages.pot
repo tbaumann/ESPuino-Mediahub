@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-27 22:04+0100\n"
+"POT-Creation-Date: 2026-10-27 22:28+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,30 +17,30 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: app.py:135
+#: app.py:137
 msgid "Incorrect password."
 msgstr ""
 
-#: app.py:158
+#: app.py:160
 #, python-format
 msgid "%(num)s device"
 msgid_plural "%(num)s devices"
 msgstr[0] ""
 msgstr[1] ""
 
-#: app.py:159
+#: app.py:161
 #, python-format
 msgid "%(num)s project"
 msgid_plural "%(num)s projects"
 msgstr[0] ""
 msgstr[1] ""
 
-#: app.py:182
+#: app.py:184
 #, python-format
 msgid "Delete ESPuino %(esp_id)s?"
 msgstr ""
 
-#: app.py:184
+#: app.py:186
 #, python-format
 msgid ""
 "There is still %(num)s card assignment for this ESPuino, which must be "
@@ -53,79 +53,79 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: app.py:210
+#: app.py:212
 msgid "Alias saved."
 msgstr ""
 
-#: app.py:220
+#: app.py:222
 #, python-format
 msgid ""
 "Device %(esp_id)s and its %(num)s card assignment(s) deleted (locally in "
 "MediaHub only)."
 msgstr ""
 
-#: app.py:222
+#: app.py:224
 #, python-format
 msgid "Device %(esp_id)s deleted."
 msgstr ""
 
-#: app.py:231 templates/card_form.html:29
+#: app.py:233 templates/card_form.html:29 templates/print_card_form.html:34
 msgid "Webradio"
 msgstr ""
 
-#: app.py:234
+#: app.py:236
 #, python-format
 msgid "%(num)s file"
 msgid_plural "%(num)s files"
 msgstr[0] ""
 msgstr[1] ""
 
-#: app.py:366
+#: app.py:368
 msgid "Card ID must be exactly 12 digits."
 msgstr ""
 
-#: app.py:370
+#: app.py:372
 msgid "Please choose a known ESPuino."
 msgstr ""
 
-#: app.py:379 app.py:399
+#: app.py:381 app.py:401
 #, python-format
 msgid "Card %(id)s is already assigned on this ESPuino — opening it for editing."
 msgstr ""
 
-#: app.py:393
+#: app.py:395
 msgid "Please choose a different, known ESPuino."
 msgstr ""
 
-#: app.py:415
+#: app.py:417
 #, python-format
 msgid "Card %(id)s duplicated to %(esp_id)s."
 msgstr ""
 
-#: app.py:441
+#: app.py:440
 msgid "A stream URL is required for webradio."
 msgstr ""
 
-#: app.py:450
+#: app.py:448
 msgid "Please choose a valid play mode."
 msgstr ""
 
-#: app.py:469
+#: app.py:466
 #, python-format
 msgid ""
 "Some selected files could not be used (missing, or not readable by the "
 "container's user) and were skipped: %(paths)s"
 msgstr ""
 
-#: app.py:478
+#: app.py:473
 msgid "At least one audio file is required."
 msgstr ""
 
-#: app.py:482
+#: app.py:478
 msgid "This play mode only supports a single file — please select just one."
 msgstr ""
 
-#: app.py:493
+#: app.py:491
 #, python-format
 msgid ""
 "This play mode plays a single folder, but the selected files lie in "
@@ -133,94 +133,130 @@ msgid ""
 "one folder only."
 msgstr ""
 
-#: app.py:523
+#: app.py:545
 #, python-format
 msgid "Card %(id)s assigned."
 msgstr ""
 
-#: app.py:526
+#: app.py:548
 #, python-format
 msgid "Card %(id)s assigned on %(num)s ESPuinos."
 msgstr ""
 
-#: app.py:550
+#: app.py:572
 #, python-format
 msgid "Force refresh triggered for card %(id)s."
 msgstr ""
 
-#: app.py:557
+#: app.py:579
 #, python-format
 msgid "Force refresh triggered for all %(num)s cards."
 msgstr ""
 
-#: app.py:583
+#: app.py:605
 #, python-format
 msgid ""
 "Secure delete: ESPuino (%(esp_id)s) did not confirm the deletion. Card "
 "was kept, please retry."
 msgstr ""
 
-#: app.py:596
+#: app.py:618
 #, python-format
 msgid "Card %(id)s deleted (%(mode)s)."
 msgstr ""
 
-#: app.py:646
+#: app.py:671
 msgid "Please give the print project a name."
 msgstr ""
 
-#: app.py:650
+#: app.py:675
 #, python-format
 msgid "Print project %(name)s created."
 msgstr ""
 
-#: app.py:658
+#: app.py:683
 #, python-format
 msgid "The print shop did not take the order: %(error)s"
 msgstr ""
 
-#: app.py:676
+#: app.py:701
 #, python-format
 msgid "The print shop could not be read: %(error)s"
 msgstr ""
 
-#: app.py:679
+#: app.py:704
 #, python-format
 msgid "Order at the print shop: %(status)s"
 msgstr ""
 
-#: app.py:730
+#: app.py:755
 #, python-format
 msgid "This print project still has %(num)s card — delete it first."
 msgid_plural "This print project still has %(num)s cards — delete them first."
 msgstr[0] ""
 msgstr[1] ""
 
-#: app.py:739
+#: app.py:764
 msgid "Print project deleted."
 msgstr ""
 
-#: app.py:810
+#: app.py:781
+msgid "The cover must be a PNG, JPEG, WebP or GIF image."
+msgstr ""
+
+#: app.py:785
+msgid "The uploaded cover could not be read."
+msgstr ""
+
+#: app.py:787
+msgid "The uploaded cover is empty."
+msgstr ""
+
+#: app.py:789
+msgid "The uploaded cover is too large (limit is 10 MB)."
+msgstr ""
+
+#: app.py:854
+msgid "Please tick the ESPuinos this card should work on."
+msgstr ""
+
+#: app.py:863
+msgid ""
+"No cover found for this card — neither beside the media nor inside it. "
+"Upload an image to print it with."
+msgstr ""
+
+#: app.py:881
+#, python-format
+msgid "The card was not created at the print shop: %(error)s"
+msgstr ""
+
+#: app.py:895
+#, python-format
+msgid "Card %(num)s created: it is at the print shop, and ready here."
+msgstr ""
+
+#: app.py:1026
 msgid "Recursion depth must be between 0 and 20."
 msgstr ""
 
-#: app.py:813
+#: app.py:1029
 msgid "Settings saved."
 msgstr ""
 
-#: app.py:823
+#: app.py:1039
 msgid "Please enter a password."
 msgstr ""
 
-#: app.py:825
+#: app.py:1041
 msgid "Passwords do not match."
 msgstr ""
 
-#: app.py:828
+#: app.py:1044
 msgid "Hub password set."
 msgstr ""
 
-#: app.py:836
+#: app.py:1052
 msgid "Hub password removed."
 msgstr ""
 
@@ -280,6 +316,79 @@ msgstr ""
 msgid "Random subfolder (shuffled)"
 msgstr ""
 
+#: templates/_media_picker.html:10
+msgid "Play mode"
+msgstr ""
+
+#: templates/_media_picker.html:20
+msgid "Selected files"
+msgstr ""
+
+#: templates/_media_picker.html:21
+msgid "Clear selection"
+msgstr ""
+
+#: templates/_media_picker.html:24
+msgid "No files selected yet — browse the library below."
+msgstr ""
+
+#: templates/_media_picker.html:29
+msgid "Media library"
+msgstr ""
+
+#: templates/_media_picker.html:30
+msgid ""
+"Files come from the library mounted at /media — MediaHub doesn't store "
+"its own copies."
+msgstr ""
+
+#: templates/_media_picker.html:40
+msgid "Use folder"
+msgstr ""
+
+#: templates/_media_picker.html:41
+msgid "No audio files here."
+msgstr ""
+
+#: templates/_media_picker.html:42
+msgid ""
+"This folder has no audio files of its own, only subfolders. This play "
+"mode doesn't include them — pick a recursive one for that."
+msgstr ""
+
+#: templates/_media_picker.html:43
+msgid "Remove"
+msgstr ""
+
+#: templates/_media_picker.html:44
+msgid "Could not list this folder (permission denied?)."
+msgstr ""
+
+#: templates/_media_picker.html:46
+msgid ""
+"This play mode only supports one file — pick a different mode to select "
+"more."
+msgstr ""
+
+#: templates/_media_picker.html:48
+msgid ""
+"Includes subfolders too (recursive play mode; depth configurable in "
+"Settings)."
+msgstr ""
+
+#: templates/_media_picker.html:51
+msgid ""
+"This play mode plays a single folder, so files from another one can't be "
+"added. Pick a recursive play mode to combine folders."
+msgstr ""
+
+#: templates/_media_picker.html:52
+msgid ""
+"The selected files lie in several folders, but this play mode plays only "
+"one — the ESPuino would find nothing to play. Pick a recursive play mode,"
+" or keep files from a single folder."
+msgstr ""
+
 #: templates/base.html:19 templates/index.html:5
 msgid "Overview"
 msgstr ""
@@ -289,7 +398,7 @@ msgid "Devices"
 msgstr ""
 
 #: templates/base.html:21 templates/cards.html:3 templates/devices.html:24
-#: templates/print_project.html:50 templates/print_projects.html:29
+#: templates/print_project.html:51 templates/print_projects.html:29
 msgid "Cards"
 msgstr ""
 
@@ -324,7 +433,7 @@ msgstr ""
 msgid "MediaHub · a local media hub for ESPuino"
 msgstr ""
 
-#: templates/card_form.html:3 templates/print_project.html:70
+#: templates/card_form.html:3 templates/print_project.html:71
 msgid "Card"
 msgstr ""
 
@@ -342,7 +451,7 @@ msgid "For ESPuino: %(device)s"
 msgstr ""
 
 #: templates/card_form.html:16 templates/cards.html:76 templates/media.html:20
-#: templates/print_project.html:72
+#: templates/print_card_form.html:21 templates/print_project.html:73
 msgid "Name"
 msgstr ""
 
@@ -350,100 +459,27 @@ msgstr ""
 msgid "(display/logs only)"
 msgstr ""
 
-#: templates/card_form.html:17
+#: templates/card_form.html:17 templates/print_card_form.html:22
 msgid "e.g. Bedtime Stories – Episode 12"
 msgstr ""
 
-#: templates/card_form.html:21
+#: templates/card_form.html:21 templates/print_card_form.html:26
 msgid "Content type"
 msgstr ""
 
-#: templates/card_form.html:25
+#: templates/card_form.html:25 templates/print_card_form.html:30
 msgid "Audio files"
 msgstr ""
 
-#: templates/card_form.html:36
-msgid "Play mode"
-msgstr ""
-
-#: templates/card_form.html:46
-msgid "Selected files"
-msgstr ""
-
-#: templates/card_form.html:47
-msgid "Clear selection"
-msgstr ""
-
-#: templates/card_form.html:50
-msgid "No files selected yet — browse the library below."
-msgstr ""
-
-#: templates/card_form.html:55
-msgid "Media library"
-msgstr ""
-
-#: templates/card_form.html:56
-msgid ""
-"Files come from the library mounted at /media — MediaHub doesn't store "
-"its own copies."
-msgstr ""
-
-#: templates/card_form.html:66
-msgid "Use folder"
-msgstr ""
-
-#: templates/card_form.html:67
-msgid "No audio files here."
-msgstr ""
-
-#: templates/card_form.html:68
-msgid ""
-"This folder has no audio files of its own, only subfolders. This play "
-"mode doesn't include them — pick a recursive one for that."
-msgstr ""
-
-#: templates/card_form.html:69
-msgid "Remove"
-msgstr ""
-
-#: templates/card_form.html:70
-msgid "Could not list this folder (permission denied?)."
-msgstr ""
-
-#: templates/card_form.html:72
-msgid ""
-"This play mode only supports one file — pick a different mode to select "
-"more."
-msgstr ""
-
-#: templates/card_form.html:74
-msgid ""
-"Includes subfolders too (recursive play mode; depth configurable in "
-"Settings)."
-msgstr ""
-
-#: templates/card_form.html:77
-msgid ""
-"This play mode plays a single folder, so files from another one can't be "
-"added. Pick a recursive play mode to combine folders."
-msgstr ""
-
-#: templates/card_form.html:78
-msgid ""
-"The selected files lie in several folders, but this play mode plays only "
-"one — the ESPuino would find nothing to play. Pick a recursive play mode,"
-" or keep files from a single folder."
-msgstr ""
-
-#: templates/card_form.html:86
+#: templates/card_form.html:41 templates/print_card_form.html:44
 msgid "Stream URL"
 msgstr ""
 
-#: templates/card_form.html:93
+#: templates/card_form.html:48
 msgid "Write to these ESPuinos"
 msgstr ""
 
-#: templates/card_form.html:94
+#: templates/card_form.html:49
 msgid ""
 "Every ticked device gets its own independent assignment with the same "
 "content, so each one keeps its own play position and cache. Unticking "
@@ -451,20 +487,21 @@ msgid ""
 " the card list."
 msgstr ""
 
-#: templates/card_form.html:99
+#: templates/card_form.html:54
 msgid "(the one you are editing)"
 msgstr ""
 
-#: templates/card_form.html:105
+#: templates/card_form.html:60
 msgid "(already has this card)"
 msgstr ""
 
-#: templates/card_form.html:113 templates/devices.html:35
+#: templates/card_form.html:68 templates/devices.html:35
 #: templates/settings.html:60
 msgid "Save"
 msgstr ""
 
-#: templates/card_form.html:114 templates/cards.html:159
+#: templates/card_form.html:69 templates/cards.html:159
+#: templates/print_card_form.html:83
 msgid "Cancel"
 msgstr ""
 
@@ -522,7 +559,7 @@ msgid ""
 "assignment for it."
 msgstr ""
 
-#: templates/cards.html:50 templates/print_project.html:71
+#: templates/cards.html:50 templates/print_project.html:72
 msgid "ESPuino"
 msgstr ""
 
@@ -556,7 +593,7 @@ msgstr ""
 msgid "Device"
 msgstr ""
 
-#: templates/cards.html:77 templates/print_project.html:73
+#: templates/cards.html:77 templates/print_project.html:74
 msgid "Status"
 msgstr ""
 
@@ -569,7 +606,7 @@ msgid "Last seen"
 msgstr ""
 
 #: templates/cards.html:94 templates/media.html:33
-#: templates/print_project.html:90
+#: templates/print_project.html:91
 msgid "in print"
 msgstr ""
 
@@ -581,11 +618,11 @@ msgstr ""
 msgid "pending"
 msgstr ""
 
-#: templates/cards.html:115 templates/print_project.html:95
+#: templates/cards.html:115 templates/print_project.html:96
 msgid "Assign"
 msgstr ""
 
-#: templates/cards.html:115 templates/print_project.html:95
+#: templates/cards.html:115 templates/print_project.html:96
 msgid "Edit"
 msgstr ""
 
@@ -743,6 +780,84 @@ msgstr ""
 msgid "Manage"
 msgstr ""
 
+#: templates/print_card_form.html:3 templates/print_card_form.html:9
+#: templates/print_project.html:14
+msgid "New card"
+msgstr ""
+
+#: templates/print_card_form.html:10
+#, python-format
+msgid "Project: %(name)s"
+msgstr ""
+
+#: templates/print_card_form.html:11
+msgid ""
+"This card is printed for you: its content is what it plays, and its cover"
+" is taken from that media unless you upload one here. Both are created in"
+" one go — the card at the print shop, and its assignment here."
+msgstr ""
+
+#: templates/print_card_form.html:14
+msgid "Back to the project"
+msgstr ""
+
+#: templates/print_card_form.html:21
+msgid "(used for the card at the print shop; display only here)"
+msgstr ""
+
+#: templates/print_card_form.html:37
+msgid ""
+"A webradio card has no media to take a cover from, so it needs an "
+"uploaded one."
+msgstr ""
+
+#: templates/print_card_form.html:50
+msgid "Cover"
+msgstr ""
+
+#: templates/print_card_form.html:51
+msgid ""
+"The image the card is printed with. Without an upload it comes from the "
+"media: an image beside the files (cover.jpg, folder.png, …) or the "
+"artwork inside one of them."
+msgstr ""
+
+#: templates/print_card_form.html:55 templates/print_card_form.html:59
+msgid "Select files to see the cover they would be printed with."
+msgstr ""
+
+#: templates/print_card_form.html:56
+msgid "No cover found for this selection — upload an image."
+msgstr ""
+
+#: templates/print_card_form.html:57
+msgid "This uploaded image will be the cover."
+msgstr ""
+
+#: templates/print_card_form.html:58
+msgid "Cover taken from the media."
+msgstr ""
+
+#: templates/print_card_form.html:64
+msgid "ESPuinos this card should work on"
+msgstr ""
+
+#: templates/print_card_form.html:65
+msgid ""
+"Each ticked device gets the same card as its own assignment, with its own"
+" play position and cache."
+msgstr ""
+
+#: templates/print_card_form.html:77
+msgid ""
+"No ESPuino has checked in yet — a device has to contact the hub at least "
+"once before a card can be written for it."
+msgstr ""
+
+#: templates/print_card_form.html:82
+msgid "Create card"
+msgstr ""
+
 #: templates/print_project.html:10
 msgid ""
 "One order at the card-printing service: open it there to pick the print "
@@ -754,54 +869,54 @@ msgstr ""
 msgid "All projects"
 msgstr ""
 
-#: templates/print_project.html:15
+#: templates/print_project.html:16
 msgid "Check order"
 msgstr ""
 
-#: templates/print_project.html:18
+#: templates/print_project.html:19
 msgid "Open in the print shop"
 msgstr ""
 
-#: templates/print_project.html:21
+#: templates/print_project.html:22
 msgid "Really delete this print project?"
 msgstr ""
 
-#: templates/print_project.html:22
+#: templates/print_project.html:23
 msgid "Delete project"
 msgstr ""
 
-#: templates/print_project.html:32 templates/print_projects.html:30
+#: templates/print_project.html:33 templates/print_projects.html:30
 msgid "Order at the print shop"
 msgstr ""
 
-#: templates/print_project.html:37
+#: templates/print_project.html:38
 msgid "no print shop configured"
 msgstr ""
 
-#: templates/print_project.html:39 templates/print_projects.html:44
+#: templates/print_project.html:40 templates/print_projects.html:44
 msgid "not registered yet"
 msgstr ""
 
-#: templates/print_project.html:45
+#: templates/print_project.html:46
 msgid "Last checked"
 msgstr ""
 
-#: templates/print_project.html:54 templates/print_projects.html:31
+#: templates/print_project.html:55 templates/print_projects.html:31
 msgid "Created"
 msgstr ""
 
-#: templates/print_project.html:61
+#: templates/print_project.html:62
 msgid ""
 "Each card of this order, per ESPuino. A card appears here as soon as it "
 "exists in the hub; it is the real card on the device once it has been "
 "printed and the hub has seen that."
 msgstr ""
 
-#: templates/print_project.html:64
+#: templates/print_project.html:65
 msgid "No card in this project yet."
 msgstr ""
 
-#: templates/print_project.html:88
+#: templates/print_project.html:89
 msgid "printed"
 msgstr ""
 

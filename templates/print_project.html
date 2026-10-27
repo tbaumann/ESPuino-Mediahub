@@ -11,6 +11,7 @@
 		</div>
 		<div class="page-head-actions">
 			<a class="btn btn-secondary" href="{{ url_for('print_projects') }}">{{ _('All projects') }}</a>
+			<a class="btn" href="{{ url_for('new_print_card', token=token) }}">{{ _('New card') }}</a>
 			<form method="post" action="{{ url_for('sync_print_project', token=token) }}">
 				<button class="btn btn-secondary" type="submit">{{ _('Check order') }}</button>
 			</form>

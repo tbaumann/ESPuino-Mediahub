@@ -94,6 +94,65 @@ def ensure_order(prefix):
     return json.loads(payload)
 
 
+def put_card(prefix, shop_card_id, name, image, back=None, back_text=None):
+    """Creates or replaces one card of the order, at a client-chosen id.
+
+    PUT rather than POST: the hub picks the id (the project counts them up), so a
+    create that fails halfway can be written again at the same id instead of
+    leaving a second card behind.
+
+    `image` is `(bytes, content_type)` and is required by the service — it is the
+    card's front, i.e. its cover. No back side is ever sent: a back spends a ribbon
+    panel, so which one a card gets is the customer's choice on the shop's page,
+    not something the hub picks on his behalf.
+    """
+    fields = {"name": name}
+    if back:
+        fields["back"] = back
+    if back_text:
+        fields["back_text"] = back_text
+    filename = "cover" + {
+        "image/png": ".png",
+        "image/jpeg": ".jpg",
+        "image/webp": ".webp",
+        "image/gif": ".gif",
+    }.get(image[1], ".img")
+    body, content_type = _multipart(fields, {"image": (filename, image[0], image[1])})
+    _, payload = _call(
+        "PUT",
+        _prefix_path(prefix, f"/cards/{shop_card_id}"),
+        body=body,
+        content_type=content_type,
+    )
+    return json.loads(payload)
+
+
+def _multipart(fields, files):
+    """A multipart/form-data body: `(bytes, content_type)`.
+
+    Hand-rolled because the hub carries no HTTP client library: one text field per
+    entry in `fields`, one file part per `(filename, bytes, content_type)` in
+    `files`. The boundary is random per call, which is what the format asks for.
+    """
+    boundary = f"----mediahub{os.urandom(12).hex()}"
+    lines = []
+    for name, value in fields.items():
+        lines.append(f"--{boundary}\r\n".encode())
+        lines.append(f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode())
+        lines.append(str(value).encode("utf-8"))
+        lines.append(b"\r\n")
+    for name, (filename, data, content_type) in files.items():
+        lines.append(f"--{boundary}\r\n".encode())
+        lines.append(
+            f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'.encode()
+        )
+        lines.append(f"Content-Type: {content_type}\r\n\r\n".encode())
+        lines.append(data)
+        lines.append(b"\r\n")
+    lines.append(f"--{boundary}--\r\n".encode())
+    return b"".join(lines), f"multipart/form-data; boundary={boundary}"
+
+
 def get_order(prefix):
     """The order as the shop has it: `status`, `ribbon`, `card_count`, …"""
     _, payload = _call("GET", _prefix_path(prefix))

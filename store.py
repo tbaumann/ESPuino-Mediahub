@@ -80,6 +80,16 @@ def _card_key(esp_id, identity):
     return f"{esp_id}/{identity}"
 
 
+def print_card_identity():
+    """A fresh identity for a card that has no UID yet (see the module docstring).
+
+    Minted outside the store's lock: two admins submitting at the same moment get
+    different identities by construction, and a collision would need the same four
+    random bytes twice.
+    """
+    return f"pending-{os.urandom(4).hex()}"
+
+
 def split_card_key(key, card):
     """The identity half of a store key, for a record read out of ``cards``.
 
@@ -546,6 +556,25 @@ class Store:
 
         def mutate(data):
             return data.setdefault("print_projects", {}).pop(token, None)
+
+        return self._mutate(mutate)
+
+    def allocate_shop_card_id(self, token):
+        """The shop card id the next card of this project gets, counting it up.
+
+        The hub picks these ids because the service's PUT is idempotent: a card
+        whose write failed halfway can be written again at the same id, instead of
+        leaving a second card behind for the same hub card. Returns None when the
+        project is gone.
+        """
+
+        def mutate(data):
+            project = data.setdefault("print_projects", {}).get(token)
+            if project is None:
+                return None
+            shop_card_id = project.get("next_shop_card_id", 1)
+            project["next_shop_card_id"] = shop_card_id + 1
+            return shop_card_id
 
         return self._mutate(mutate)
 

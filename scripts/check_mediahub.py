@@ -23,13 +23,17 @@ Exits non-zero on the first failure; prints every check either way.
 """
 
 import http.server
+import io
 import json
 import os
+import re
 import shutil
+import struct
 import sys
 import tempfile
 import threading
 import uuid
+import zlib
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROOT = tempfile.mkdtemp(prefix="mediahub-check-")
@@ -49,6 +53,8 @@ class ShopStub(http.server.BaseHTTPRequestHandler):
     calls = []
     status = "draft"
     cards = []
+    last_body = b""
+    put_code = 201
 
     def _reply(self, code, payload):
         body = json.dumps(payload).encode("utf-8")
@@ -65,7 +71,12 @@ class ShopStub(http.server.BaseHTTPRequestHandler):
 
     def do_PUT(self):
         path, prefix = self._target()
+        length = int(self.headers.get("content-length") or 0)
+        ShopStub.last_body = self.rfile.read(length) if length else b""
         ShopStub.calls.append(("PUT", path, self.headers.get("authorization")))
+        if ShopStub.put_code != 201:
+            self._reply(ShopStub.put_code, {"error": "prefix is 'paid' and can no longer be modified"})
+            return
         self._reply(201, self._order(prefix))
 
     def do_GET(self):
@@ -104,6 +115,78 @@ client = mediahub.app.test_client()
 client.get("/lang/en")
 
 FAILED = []
+
+
+def tiny_png(colour=b"\xd0\x30\x30"):
+    """A real 2x2 PNG of one colour.
+
+    Real because the *shop* decodes the cover it is handed — a handful of junk
+    bytes would come back as a card whose render failed, not as a cover. Two
+    colours, so a test can tell one image from another.
+    """
+
+    def chunk(kind, data):
+        return (
+            struct.pack(">I", len(data))
+            + kind
+            + data
+            + struct.pack(">I", zlib.crc32(kind + data))
+        )
+
+    raw = b"".join(b"\x00" + colour * 2 for _ in range(2))
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 2, 2, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(raw))
+        + chunk(b"IEND", b"")
+    )
+
+
+# A real MPEG-1 Layer III frame at 128 kbps / 44.1 kHz: 144 * 128000 / 44100 = 417
+# bytes. mutagen refuses to sync to anything shorter, and a file it cannot sync to
+# is not an mp3 as far as it is concerned — the tag would never be read.
+AUDIO_FRAME = b"\xff\xfb\x90\x00" + b"\x00" * 413
+
+
+def id3_mp3(path, image, mime="image/png"):
+    """An mp3 with one APIC picture in it, built here and now.
+
+    Hand-built so the check needs no binary fixture in the repository, and no ID3
+    writer: an ID3v2.3 header, one APIC frame, and enough audio frames for the
+    file to be recognised as an mp3.
+    """
+    frame = (
+        b"APIC"
+        + len(b"\x00" + mime.encode() + b"\x00" + b"\x03" + b"\x00" + image).to_bytes(4, "big")
+        + b"\x00\x00"
+        + b"\x00"
+        + mime.encode()
+        + b"\x00"
+        + b"\x03"
+        + b"\x00"
+        + image
+    )
+    size = len(frame)
+    header = b"ID3\x03\x00\x00" + bytes(
+        [(size >> 21) & 0x7F, (size >> 14) & 0x7F, (size >> 7) & 0x7F, size & 0x7F]
+    )
+    with open(path, "wb") as handle:
+        handle.write(header + frame + AUDIO_FRAME * 4)
+
+
+def labels_json(html):
+    """The media browser's label block, parsed.
+
+    Its contract with the browser is a JSON object in a script tag, and a broken
+    one breaks the page silently — no server-side test would notice otherwise.
+    """
+    match = re.search(rb'id="media-tree-labels"[^>]*>(.*?)</script>', html, re.S)
+    if not match:
+        return None
+    try:
+        return json.loads(match.group(1).decode("utf-8"))
+    except ValueError:
+        return None
 
 
 def check(label, cond, detail=""):
@@ -370,7 +453,11 @@ check("the order's cards are readable",
       ("GET", f"/api/prefixes/{shop_project['prefix']}/cards", None) in ShopStub.calls
       and cards[0]["id"] == 1 and cards[0]["serial_number"] is None)
 
-shop.shutdown()
+# A dead port rather than a stopped server: the stub is needed again in a moment,
+# and rebinding the same port would be a race. The hub has one setting for where
+# the shop is, so this is exactly what an unreachable shop looks like to it.
+live_url = mediahub.printer_client.BASE_URL
+mediahub.printer_client.BASE_URL = "http://127.0.0.1:9"
 r = client.post("/print/new", data={"name": "No shop"}, follow_redirects=True)
 no_shop_token = [t for t, p in store.list_print_projects().items() if p["name"] == "No shop"][0]
 check("a shop that is down does not lose the project",
@@ -381,8 +468,174 @@ before = store.get_print_project(shop_token)["status"]
 r = client.post(f"/print/{shop_token}/sync", follow_redirects=True)
 check("a sync against a dead shop degrades", b"could not be read" in r.data)
 check("...without touching the stored status", store.get_print_project(shop_token)["status"] == before)
+mediahub.printer_client.BASE_URL = live_url
 
-print("\n== 9. an existing db.json without the new key ==")
+print("\n== 9. a card at the print shop ==")
+png = tiny_png()
+uploaded_png = tiny_png(b"\x30\x60\xd0")
+os.makedirs(os.path.join(ROOT, "media", "Printed"), exist_ok=True)
+with open(os.path.join(ROOT, "media", "Printed", "cover.png"), "wb") as handle:
+    handle.write(png)
+for name in ("01.mp3", "02.mp3"):
+    with open(os.path.join(ROOT, "media", "Printed", name), "wb") as handle:
+        handle.write(b"\xff\xfb" + b"\x00" * 64)
+# A second folder whose artwork is *inside* the track, with nothing beside it.
+os.makedirs(os.path.join(ROOT, "media", "Tagged"), exist_ok=True)
+id3_mp3(os.path.join(ROOT, "media", "Tagged", "solo.mp3"), png)
+
+r = client.get(f"/print/{shop_token}/card/new")
+check("the new-card form renders", r.status_code == 200 and b"cover-preview" in r.data)
+check("...with exactly one media picker",
+      r.data.count(b'id="media-tree"') == 1 and r.data.count(b'id="selected-paths-json"') == 1)
+check("...whose browser labels are valid JSON", labels_json(r.data) is not None)
+check("...and it asks for the cover", b'name="cover"' in r.data)
+
+r = client.post(
+    f"/print/{shop_token}/card/cover", data={"selected_paths_json": json.dumps(["Printed/01.mp3"])}
+)
+check("the preview finds a sidecar cover",
+      r.status_code == 200 and r.data == png and r.mimetype == "image/png")
+r = client.post(
+    f"/print/{shop_token}/card/cover", data={"selected_paths_json": json.dumps(["Tagged/solo.mp3"])}
+)
+check("and the artwork inside a track", r.status_code == 200 and r.data == png)
+r = client.post(
+    f"/print/{shop_token}/card/cover", data={"selected_paths_json": json.dumps(["top.mp3"])}
+)
+check("a selection with no cover anywhere is a 404", r.status_code == 404)
+
+calls_before = len(ShopStub.calls)
+r = client.post(
+    f"/print/{shop_token}/card/new",
+    data={
+        # No name: the card at the shop has to be named after something.
+        "name": "",
+        "kind": "files",
+        "play_mode": "5",
+        "selected_paths_json": json.dumps(["Printed/01.mp3", "Printed/02.mp3"]),
+        "play_root": "Printed",
+        "esp_ids": ["esp-a", "esp-b"],
+    },
+    follow_redirects=True,
+)
+puts = [call for call in ShopStub.calls[calls_before:] if call[0] == "PUT"]
+check("the card was written to the shop once, at the project's next id",
+      len(puts) == 1 and puts[0][1] == f"/api/prefixes/{shop_project['prefix']}/cards/1")
+check("...with no credential", puts[0][2] is None)
+body = ShopStub.last_body
+check("...as multipart carrying a name derived from the media",
+      b'name="name"' in body and b"Printed" in body)
+check("...and the cover as the image part",
+      b'name="image"; filename="cover.png"' in body and b"image/png" in body and png in body)
+check("...and no back side, which is the customer's choice at the shop", b'name="back"' not in body)
+
+raw = cards_raw()
+card_keys = [
+    key
+    for key, card in raw.items()
+    if (card.get("print") or {}).get("id") == 1 and (card.get("print") or {}).get("token") == shop_token
+]
+identities = {store_lib.split_card_key(key, raw[key]) for key in card_keys}
+check("the hub holds one card per ticked device, under one identity",
+      len(card_keys) == 2 and len(identities) == 1 and list(identities)[0].startswith("pending-"))
+record = raw[card_keys[0]]
+check("...assigned, with no UID yet", record["status"] == "assigned" and record["card_id"] is None)
+check("...carrying the print order", record["print"]["prefix"] == shop_project["prefix"])
+check("the project counts both records", store.count_cards_for_print_project(shop_token) == 2)
+check("and its card counter moved on", store.get_print_project(shop_token)["next_shop_card_id"] == 2)
+r = client.get(f"/print/{shop_token}")
+check("the project page lists the card as in print", b"#1" in r.data and b"in print" in r.data)
+
+r = client.post(
+    f"/print/{shop_token}/card/new",
+    data={
+        "kind": "files",
+        "play_mode": "5",
+        "selected_paths_json": json.dumps(["top.mp3"]),
+        "esp_ids": ["esp-a"],
+    },
+    follow_redirects=False,
+)
+check("a card with no cover anywhere is refused", r.status_code == 200 and b"No cover found" in r.data)
+check("...and the form comes back with the selection, not an empty one", b"top.mp3" in r.data)
+check("...and nothing was written", store.get_print_project(shop_token)["next_shop_card_id"] == 2)
+
+r = client.post(
+    f"/print/{shop_token}/card/new",
+    data={
+        "kind": "files",
+        "play_mode": "5",
+        "selected_paths_json": json.dumps(["Printed/01.mp3"]),
+        "play_root": "Printed",
+    },
+    follow_redirects=False,
+)
+check("a card for nobody is refused", r.status_code == 200 and b"tick the ESPuinos" in r.data)
+check("...and nothing was written", store.get_print_project(shop_token)["next_shop_card_id"] == 2)
+
+# An upload of one's own wins over whatever the media has.
+calls_before = len(ShopStub.calls)
+r = client.post(
+    f"/print/{shop_token}/card/new",
+    data={
+        "kind": "files",
+        "play_mode": "5",
+        "selected_paths_json": json.dumps(["Printed/01.mp3", "Printed/02.mp3"]),
+        "play_root": "Printed",
+        "esp_ids": ["esp-a"],
+        "cover": (io.BytesIO(uploaded_png), "mine.png"),
+    },
+    content_type="multipart/form-data",
+    follow_redirects=True,
+)
+puts = [call for call in ShopStub.calls[calls_before:] if call[0] == "PUT"]
+check("an uploaded cover is used, not the one beside the media",
+      len(puts) == 1 and uploaded_png in ShopStub.last_body and png not in ShopStub.last_body)
+
+# A shop that refuses (a paid order, say) must leave the hub alone.
+ShopStub.put_code = 409
+counter = store.get_print_project(shop_token)["next_shop_card_id"]
+calls_before = len(ShopStub.calls)
+r = client.post(
+    f"/print/{shop_token}/card/new",
+    data={
+        "kind": "files",
+        "play_mode": "5",
+        "selected_paths_json": json.dumps(["Printed/01.mp3"]),
+        "play_root": "Printed",
+        "esp_ids": ["esp-a"],
+    },
+    follow_redirects=False,
+)
+check("a shop that refuses is reported with its own message",
+      r.status_code == 200 and b"no longer be modified" in r.data)
+check("...and no card is recorded here", store.count_cards_for_print_project(shop_token) == 3)
+check("...and the id it consumed is simply skipped, not reused",
+      store.get_print_project(shop_token)["next_shop_card_id"] == counter + 1)
+ShopStub.put_code = 201
+
+# A webradio card has no media to take a cover from: the upload is the only source.
+calls_before = len(ShopStub.calls)
+r = client.post(
+    f"/print/{shop_token}/card/new",
+    data={
+        "name": "Radio",
+        "kind": "webradio",
+        "stream_url": "http://radio.example/stream.mp3",
+        "esp_ids": ["esp-a"],
+        "cover": (io.BytesIO(png), "radio.png"),
+    },
+    content_type="multipart/form-data",
+    follow_redirects=True,
+)
+puts = [call for call in ShopStub.calls[calls_before:] if call[0] == "PUT"]
+check("a webradio card is created with an uploaded cover",
+      len(puts) == 1 and b'name="name"' in ShopStub.last_body and b"Radio" in ShopStub.last_body)
+check("...and the project refuses to be deleted while it holds cards",
+      client.post(f"/print/{shop_token}/delete", follow_redirects=True).status_code == 200
+      and store.get_print_project(shop_token) is not None)
+
+print("\n== 10. an existing db.json without the new key ==")
 old_install = os.path.join(ROOT, "old-install")
 os.makedirs(old_install, exist_ok=True)
 with open(os.path.join(old_install, "db.json"), "w", encoding="utf-8") as f:

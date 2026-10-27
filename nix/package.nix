@@ -14,6 +14,9 @@ let
     ps.flask
     ps.flask-babel
     ps.gunicorn
+    # Cover art out of the media library's own tags (cover_art.py). Pure Python,
+    # so the Docker image's arm/v7 build is unaffected.
+    ps.mutagen
   ]);
 in
   stdenv.mkDerivation {
@@ -44,7 +47,8 @@ in
       runHook preInstall
       mkdir -p $out/share/espuino-mediahub
       cp -r \
-        app.py espuino_client.py manifest.py media_library.py printer_client.py store.py \
+        app.py cover_art.py espuino_client.py manifest.py media_library.py \
+        printer_client.py store.py \
         templates static translations babel.cfg messages.pot \
         $out/share/espuino-mediahub/
       mkdir -p $out/bin

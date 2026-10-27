@@ -10,6 +10,7 @@ import posixpath
 
 from flask import (
     Flask,
+    Response,
     abort,
     flash,
     jsonify,
@@ -24,6 +25,7 @@ from flask_babel import Babel, get_locale, gettext as _, ngettext
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
+import cover_art
 import manifest as manifest_lib
 import media_library
 import printer_client
@@ -416,6 +418,94 @@ def duplicate_card(esp_id, card_id):
     return redirect(url_for("cards"))
 
 
+def _read_assignment(form):
+    """The assignment a card form carries, validated: `(payload, error, warning)`.
+
+    Both the ordinary assignment form and the print-card form end in the same
+    `save_assignment` call, so both read their content through this function — a
+    rule only one of them applied would be a bug in whichever form the admin
+    happened to use.
+
+    `payload` is the six fields `save_assignment` takes after the card's identity.
+    `error` is fatal (nothing may be written) and `warning` is not (the assignment
+    is usable, something was skipped); either, both or neither may be set, and a
+    warning is reported alongside an error so a form does not lose it.
+    """
+    name = form.get("name", "").strip()
+    kind = form.get("kind", "files")
+
+    if kind == "webradio":
+        stream_url = form.get("stream_url", "").strip()
+        if not stream_url:
+            return None, _("A stream URL is required for webradio."), None
+        return (name, "webradio", None, stream_url, [], ""), None, None
+
+    try:
+        play_mode = int(form.get("play_mode", ""))
+    except ValueError:
+        play_mode = -1
+    if not manifest_lib.is_valid_file_play_mode(play_mode):
+        return None, _("Please choose a valid play mode."), None
+
+    try:
+        selected_paths = json.loads(form.get("selected_paths_json", "[]"))
+    except ValueError:
+        selected_paths = []
+
+    files, missing = [], []
+    for relpath in selected_paths:
+        info = media_library.stat_and_hash(MEDIA_DIR, relpath)
+        if info is None:
+            missing.append(relpath)
+        else:
+            files.append(info)
+
+    warning = None
+    if missing:
+        warning = _(
+            "Some selected files could not be used (missing, or not "
+            "readable by the container's user) and were skipped: "
+            "%(paths)s",
+            paths=", ".join(missing),
+        )
+
+    if not files:
+        return None, _("At least one audio file is required."), warning
+
+    if play_mode in manifest_lib.SINGLE_FILE_PLAY_MODES and len(files) > 1:
+        return (
+            None,
+            _("This play mode only supports a single file — please select just one."),
+            warning,
+        )
+
+    # The ESPuino is handed a folder, not a file list (see
+    # SINGLE_FOLDER_PLAY_MODES): with files from several folders these modes find
+    # nothing to play at all. The browser already refuses the combination, but a
+    # form can be submitted without it.
+    folders = {posixpath.dirname(f["path"]) for f in files}
+    if play_mode in manifest_lib.SINGLE_FOLDER_PLAY_MODES and len(folders) > 1:
+        return (
+            None,
+            _(
+                "This play mode plays a single folder, but the selected files "
+                "lie in %(num)s different ones. Choose a recursive play mode, "
+                "or pick files from one folder only.",
+                num=len(folders),
+            ),
+            warning,
+        )
+
+    files.sort(key=lambda f: f["path"])
+    # The folder "use folder" was applied to, if that is how the selection came
+    # about. Validated against the library rather than trusted: it is a hidden form
+    # field, and it ends up in the manifest as the folder an ESPuino will play.
+    play_root = (form.get("play_root") or "").strip().strip("/").strip()
+    if play_root and media_library.list_directory(MEDIA_DIR, play_root) is None:
+        play_root = ""
+    return (name, "files", play_mode, None, files, play_root), None, warning
+
+
 @app.route("/cards/<esp_id>/<card_id>/assign", methods=["GET", "POST"])
 def assign_card(esp_id, card_id):
     card = store.get_card(esp_id, card_id) or {
@@ -432,82 +522,14 @@ def assign_card(esp_id, card_id):
     }
 
     if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        kind = request.form.get("kind", "files")
-
-        if kind == "webradio":
-            stream_url = request.form.get("stream_url", "").strip()
-            if not stream_url:
-                flash(_("A stream URL is required for webradio."), "error")
-                return redirect(url_for("assign_card", esp_id=esp_id, card_id=card_id))
-            payload = (name, "webradio", None, stream_url, [], "")
-        else:
-            try:
-                play_mode = int(request.form.get("play_mode", ""))
-            except ValueError:
-                play_mode = -1
-            if not manifest_lib.is_valid_file_play_mode(play_mode):
-                flash(_("Please choose a valid play mode."), "error")
-                return redirect(url_for("assign_card", esp_id=esp_id, card_id=card_id))
-
-            try:
-                selected_paths = json.loads(request.form.get("selected_paths_json", "[]"))
-            except ValueError:
-                selected_paths = []
-
-            files, missing = [], []
-            for relpath in selected_paths:
-                info = media_library.stat_and_hash(MEDIA_DIR, relpath)
-                if info is None:
-                    missing.append(relpath)
-                else:
-                    files.append(info)
-
-            if missing:
-                flash(
-                    _(
-                        "Some selected files could not be used (missing, or not "
-                        "readable by the container's user) and were skipped: "
-                        "%(paths)s",
-                        paths=", ".join(missing),
-                    ),
-                    "error",
-                )
-
-            if not files:
-                flash(_("At least one audio file is required."), "error")
-                return redirect(url_for("assign_card", esp_id=esp_id, card_id=card_id))
-
-            if play_mode in manifest_lib.SINGLE_FILE_PLAY_MODES and len(files) > 1:
-                flash(_("This play mode only supports a single file — please select just one."), "error")
-                return redirect(url_for("assign_card", esp_id=esp_id, card_id=card_id))
-
-            # The ESPuino is handed a folder, not a file list (see
-            # SINGLE_FOLDER_PLAY_MODES): with files from several folders these
-            # modes find nothing to play at all. The browser already refuses
-            # the combination, but a form can be submitted without it.
-            folders = {posixpath.dirname(f["path"]) for f in files}
-            if play_mode in manifest_lib.SINGLE_FOLDER_PLAY_MODES and len(folders) > 1:
-                flash(
-                    _(
-                        "This play mode plays a single folder, but the selected files "
-                        "lie in %(num)s different ones. Choose a recursive play mode, "
-                        "or pick files from one folder only.",
-                        num=len(folders),
-                    ),
-                    "error",
-                )
-                return redirect(url_for("assign_card", esp_id=esp_id, card_id=card_id))
-
-            files.sort(key=lambda f: f["path"])
-            # The folder "use folder" was applied to, if that is how the
-            # selection came about. Validated against the library rather than
-            # trusted: it is a hidden form field, and it ends up in the
-            # manifest as the folder an ESPuino will play.
-            play_root = (request.form.get("play_root") or "").strip().strip("/").strip()
-            if play_root and media_library.list_directory(MEDIA_DIR, play_root) is None:
-                play_root = ""
-            payload = (name, "files", play_mode, None, files, play_root)
+        payload, error, warning = _read_assignment(request.form)
+        if warning:
+            # Not fatal: the rest of the selection is usable, and the admin is told
+            # what was dropped rather than losing the whole form over it.
+            flash(warning, "error")
+        if error:
+            flash(error, "error")
+            return redirect(url_for("assign_card", esp_id=esp_id, card_id=card_id))
 
         # Same content, one independent assignment per device — the ESPuinos
         # keep their own play positions and caches.
@@ -741,6 +763,197 @@ def delete_print_project(token):
     store.delete_print_project(token)
     flash(_("Print project deleted."), "success")
     return redirect(url_for("print_projects"))
+
+
+def _uploaded_cover():
+    """`(cover, error)` from the cover part of a card form.
+
+    `cover` is `(bytes, content_type)` the way `cover_art.resolve` wants it. An
+    upload the print shop cannot print is an *error*, not a silent fall back to the
+    media: the admin picked that file on purpose, and a card printed with the wrong
+    picture is worse than a form that says no.
+    """
+    upload = request.files.get("cover")
+    if upload is None or not upload.filename:
+        return None, None
+    content_type = (upload.mimetype or "").lower()
+    if content_type not in cover_art.CONTENT_TYPES.values():
+        return None, _("The cover must be a PNG, JPEG, WebP or GIF image.")
+    try:
+        data = upload.read()
+    except OSError:
+        return None, _("The uploaded cover could not be read.")
+    if not data:
+        return None, _("The uploaded cover is empty.")
+    if len(data) > cover_art.MAX_ART_BYTES:
+        return None, _("The uploaded cover is too large (limit is 10 MB).")
+    return (data, content_type), None
+
+
+def _selected_devices(known):
+    """The devices a print card is written to: every ticked box that is known.
+
+    No primary device here, unlike the assignment form: there is no card yet, so
+    all of them are equal targets — the card exists once, and each ticked ESPuino
+    gets its own record of it (own play position, own cache).
+    """
+    return [esp_id for esp_id in request.form.getlist("esp_ids") if esp_id in known]
+
+
+def _card_name(payload, shop_card_id):
+    """A name for the card at the shop: the admin's, or one derived from the media.
+
+    The service requires a non-empty name, while a hub card's name is optional
+    ("display/logs only" here), so an unnamed card is named after the folder or the
+    file it plays — and only then after its number. Not translated: this is a card's
+    name at another service, not hub UI text.
+    """
+    name, _kind, _play_mode, _stream_url, files, play_root = payload
+    if name:
+        return name
+    if play_root:
+        return os.path.basename(play_root.rstrip("/")) or f"Card {shop_card_id}"
+    if files:
+        stem = os.path.splitext(os.path.basename(files[0]["path"]))[0]
+        if stem:
+            return stem
+    return f"Card {shop_card_id}"
+
+
+@app.route("/print/<token>/card/new", methods=["GET", "POST"])
+def new_print_card(token):
+    """One card of this project: an ordinary assignment plus the image it is printed
+    with, written to both systems in one submit.
+
+    The cover is the reason the two happen together: the shop refuses a card without
+    a front image, and the only thing that says what the cover *is* is the media the
+    card will play. So the assignment is read and validated first, then the cover is
+    resolved from it, then the shop card is created at the project's next card id —
+    and only then does a hub record exist, holding the print order it belongs to.
+    """
+    project = store.get_print_project(token)
+    if project is None:
+        abort(404)
+
+    devices = store.list_devices()
+    if request.method == "POST":
+        payload, error, warning = _read_assignment(request.form)
+        upload, upload_error = _uploaded_cover()
+        if warning:
+            flash(warning, "error")
+        if error or upload_error:
+            flash(error or upload_error, "error")
+            return _print_card_form(token, project, devices, request.form)
+
+        targets = _selected_devices(devices)
+        if not targets:
+            # Every failure below re-renders the form with what was submitted
+            # instead of redirecting: a folder-at-a-time selection is a lot of work
+            # to lose to a missing cover, and there is no stored record to prefill
+            # from, the way there is when editing an existing card.
+            flash(_("Please tick the ESPuinos this card should work on."), "error")
+            return _print_card_form(token, project, devices, request.form)
+
+        # An uploaded cover wins; otherwise it comes from the media (a sidecar image
+        # beside it, or the artwork inside a track).
+        cover = cover_art.resolve(MEDIA_DIR, [f["path"] for f in payload[4]], upload)
+        if cover is None:
+            flash(
+                _(
+                    "No cover found for this card — neither beside the media nor inside "
+                    "it. Upload an image to print it with."
+                ),
+                "error",
+            )
+            return _print_card_form(token, project, devices, request.form)
+
+        shop_card_id = store.allocate_shop_card_id(token)
+        try:
+            printer_client.put_card(
+                project["prefix"], shop_card_id, _card_name(payload, shop_card_id), cover
+            )
+        except printer_client.PrinterError as exc:
+            # Nothing was written on this side either, so the card can be submitted
+            # again: the shop id was consumed, but the ids are the hub's to pick and
+            # the retry lands on the next one — a gap in them is already possible
+            # (a card deleted at the shop).
+            flash(
+                _("The card was not created at the print shop: %(error)s", error=str(exc)),
+                "error",
+            )
+            return _print_card_form(token, project, devices, request.form)
+
+        # The hub's record of the same card. It has no UID yet — it is identified by
+        # a hub token until the print process reports one — and it carries the print
+        # order, which is what `promote_print_card` finds it by afterwards.
+        identity = store_lib.print_card_identity()
+        print_ref = {"token": token, "prefix": project["prefix"], "id": shop_card_id}
+        for esp_id in targets:
+            store.save_assignment(esp_id, identity, *payload, print_ref=print_ref)
+
+        flash(
+            _("Card %(num)s created: it is at the print shop, and ready here.", num=shop_card_id),
+            "success",
+        )
+        return redirect(url_for("print_project", token=token))
+
+    return _print_card_form(token, project, devices)
+
+
+def _print_card_form(token, project, devices, form=None):
+    """Renders the print-card form, prefilled from `form` when a submit failed."""
+    form = form or {}
+    try:
+        submitted = json.loads(form.get("selected_paths_json", "[]"))
+    except ValueError:
+        submitted = []
+    try:
+        play_mode = int(form.get("play_mode", ""))
+    except (TypeError, ValueError):
+        play_mode = None
+    return render_template(
+        "print_card_form.html",
+        token=token,
+        project=project,
+        devices=devices,
+        play_modes=manifest_lib.FILE_PLAY_MODES,
+        single_file_play_modes=list(manifest_lib.SINGLE_FILE_PLAY_MODES),
+        recursive_play_modes=list(manifest_lib.RECURSIVE_PLAY_MODES),
+        single_folder_play_modes=list(manifest_lib.SINGLE_FOLDER_PLAY_MODES),
+        gather_recursive_play_modes=list(manifest_lib.GATHER_RECURSIVE_PLAY_MODES),
+        initial_name=form.get("name", ""),
+        initial_kind=form.get("kind", "files"),
+        initial_stream_url=form.get("stream_url", ""),
+        selected_play_mode=play_mode,
+        selected_play_root=form.get("play_root", ""),
+        initial_selection=submitted if isinstance(submitted, list) else [],
+        # A failed submit re-renders this form rather than redirecting, so what was
+        # ticked has to come back with it.
+        selected_esp_ids=form.getlist("esp_ids") if hasattr(form, "getlist") else [],
+    )
+
+
+@app.route("/print/<token>/card/cover", methods=["POST"])
+def print_card_cover(token):
+    """The cover a selection would be printed with, for the form's own preview.
+
+    POST, not GET: a folder-at-a-time selection is hundreds of paths and does not
+    belong in a URL. Resolved through the same `cover_art.resolve` the create uses,
+    so the preview cannot promise a card that creating it would then refuse.
+    """
+    if store.get_print_project(token) is None:
+        abort(404)
+    try:
+        paths = json.loads(request.form.get("selected_paths_json", "[]"))
+    except ValueError:
+        paths = []
+    if not isinstance(paths, list) or not paths:
+        abort(404)
+    cover = cover_art.resolve(MEDIA_DIR, [str(path) for path in paths])
+    if cover is None:
+        abort(404)
+    data, content_type = cover
+    return Response(data, mimetype=content_type)
 
 
 # --------------------------------------------------------------------------
