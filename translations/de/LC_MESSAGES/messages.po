@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: ESPuino MediaHub\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-27 22:28+0100\n"
+"POT-Creation-Date: 2026-10-27 22:36+0100\n"
 "PO-Revision-Date: 2026-07-15 09:43+0200\n"
 "Last-Translator: ESPuino MediaHub\n"
 "Language: de\n"
@@ -184,62 +184,69 @@ msgstr ""
 msgid "Card %(id)s deleted (%(mode)s)."
 msgstr "Karte %(id)s gelöscht (%(mode)s)."
 
-#: app.py:671
+#: app.py:691
 msgid "Please give the print project a name."
 msgstr "Bitte einem Druckprojekt einen Namen geben."
 
-#: app.py:675
+#: app.py:695
 #, python-format
 msgid "Print project %(name)s created."
 msgstr "Druckprojekt %(name)s angelegt."
 
-#: app.py:683
+#: app.py:703
 #, python-format
 msgid "The print shop did not take the order: %(error)s"
 msgstr "Der Druckshop hat die Bestellung nicht angenommen: %(error)s"
 
-#: app.py:701
+#: app.py:721
 #, python-format
 msgid "The print shop could not be read: %(error)s"
 msgstr "Der Druckshop konnte nicht gelesen werden: %(error)s"
 
-#: app.py:704
+#: app.py:724
 #, python-format
 msgid "Order at the print shop: %(status)s"
 msgstr "Bestellung im Druckshop: %(status)s"
 
-#: app.py:755
+#: app.py:731
+#, python-format
+msgid "%(num)s card is printed and works here now."
+msgid_plural "%(num)s cards are printed and work here now."
+msgstr[0] "%(num)s Karte ist gedruckt und funktioniert jetzt hier."
+msgstr[1] "%(num)s Karten sind gedruckt und funktionieren jetzt hier."
+
+#: app.py:788
 #, python-format
 msgid "This print project still has %(num)s card — delete it first."
 msgid_plural "This print project still has %(num)s cards — delete them first."
 msgstr[0] "Dieses Druckprojekt hat noch %(num)s Karte — diese zuerst löschen."
 msgstr[1] "Dieses Druckprojekt hat noch %(num)s Karten — diese zuerst löschen."
 
-#: app.py:764
+#: app.py:797
 msgid "Print project deleted."
 msgstr "Druckprojekt gelöscht."
 
-#: app.py:781
+#: app.py:814
 msgid "The cover must be a PNG, JPEG, WebP or GIF image."
 msgstr "Das Cover muss ein PNG-, JPEG-, WebP- oder GIF-Bild sein."
 
-#: app.py:785
+#: app.py:818
 msgid "The uploaded cover could not be read."
 msgstr "Das hochgeladene Cover konnte nicht gelesen werden."
 
-#: app.py:787
+#: app.py:820
 msgid "The uploaded cover is empty."
 msgstr "Das hochgeladene Cover ist leer."
 
-#: app.py:789
+#: app.py:822
 msgid "The uploaded cover is too large (limit is 10 MB)."
 msgstr "Das hochgeladene Cover ist zu groß (Limit: 10 MB)."
 
-#: app.py:854
+#: app.py:889
 msgid "Please tick the ESPuinos this card should work on."
 msgstr "Bitte die ESPuinos ankreuzen, auf denen die Karte gelten soll."
 
-#: app.py:863
+#: app.py:898
 msgid ""
 "No cover found for this card — neither beside the media nor inside it. "
 "Upload an image to print it with."
@@ -247,37 +254,37 @@ msgstr ""
 "Kein Cover für diese Karte gefunden — weder neben den Medien noch darin. "
 "Ein Bild hochladen, um sie damit zu drucken."
 
-#: app.py:881
+#: app.py:916
 #, python-format
 msgid "The card was not created at the print shop: %(error)s"
 msgstr "Die Karte wurde im Druckshop nicht angelegt: %(error)s"
 
-#: app.py:895
+#: app.py:930
 #, python-format
 msgid "Card %(num)s created: it is at the print shop, and ready here."
 msgstr "Karte %(num)s angelegt: sie liegt im Druckshop und ist hier bereit."
 
-#: app.py:1026
+#: app.py:1061
 msgid "Recursion depth must be between 0 and 20."
 msgstr "Die Rekursionstiefe muss zwischen 0 und 20 liegen."
 
-#: app.py:1029
+#: app.py:1064
 msgid "Settings saved."
 msgstr "Einstellungen gespeichert."
 
-#: app.py:1039
+#: app.py:1074
 msgid "Please enter a password."
 msgstr "Bitte ein Passwort eingeben."
 
-#: app.py:1041
+#: app.py:1076
 msgid "Passwords do not match."
 msgstr "Die Passwörter stimmen nicht überein."
 
-#: app.py:1044
+#: app.py:1079
 msgid "Hub password set."
 msgstr "Hub-Passwort gesetzt."
 
-#: app.py:1052
+#: app.py:1087
 msgid "Hub password removed."
 msgstr "Hub-Passwort entfernt."
 
@@ -660,7 +667,7 @@ msgid "Last seen"
 msgstr "Zuletzt gesehen"
 
 #: templates/cards.html:94 templates/media.html:33
-#: templates/print_project.html:91
+#: templates/print_project.html:96
 msgid "in print"
 msgstr "im Druck"
 
@@ -672,11 +679,11 @@ msgstr "zugewiesen"
 msgid "pending"
 msgstr "wartend"
 
-#: templates/cards.html:115 templates/print_project.html:96
+#: templates/cards.html:115 templates/print_project.html:101
 msgid "Assign"
 msgstr "Zuweisen"
 
-#: templates/cards.html:115 templates/print_project.html:96
+#: templates/cards.html:115 templates/print_project.html:101
 msgid "Edit"
 msgstr "Bearbeiten"
 
@@ -993,7 +1000,7 @@ msgstr ""
 msgid "No card in this project yet."
 msgstr "Noch keine Karte in diesem Projekt."
 
-#: templates/print_project.html:89
+#: templates/print_project.html:94
 msgid "printed"
 msgstr "gedruckt"
 

@@ -80,7 +80,12 @@
 					{% for identity, card, device_label in group.cards %}
 					<tr>
 						{% if loop.first %}
-							<td rowspan="{{ group.cards | length }}"><code>#{{ group.id }}</code></td>
+							<td rowspan="{{ group.cards | length }}">
+								<code>#{{ group.id }}</code>
+								{% if group.promoted_at %}
+									<br><span class="muted">{{ group.cards[0][0] }}</span>
+								{% endif %}
+							</td>
 						{% endif %}
 						<td>{{ device_label }}</td>
 						<td>{{ card.name or "—" }}</td>

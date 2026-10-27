@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-27 22:28+0100\n"
+"POT-Creation-Date: 2026-10-27 22:36+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -165,98 +165,105 @@ msgstr ""
 msgid "Card %(id)s deleted (%(mode)s)."
 msgstr ""
 
-#: app.py:671
+#: app.py:691
 msgid "Please give the print project a name."
 msgstr ""
 
-#: app.py:675
+#: app.py:695
 #, python-format
 msgid "Print project %(name)s created."
 msgstr ""
 
-#: app.py:683
+#: app.py:703
 #, python-format
 msgid "The print shop did not take the order: %(error)s"
 msgstr ""
 
-#: app.py:701
+#: app.py:721
 #, python-format
 msgid "The print shop could not be read: %(error)s"
 msgstr ""
 
-#: app.py:704
+#: app.py:724
 #, python-format
 msgid "Order at the print shop: %(status)s"
 msgstr ""
 
-#: app.py:755
+#: app.py:731
+#, python-format
+msgid "%(num)s card is printed and works here now."
+msgid_plural "%(num)s cards are printed and work here now."
+msgstr[0] ""
+msgstr[1] ""
+
+#: app.py:788
 #, python-format
 msgid "This print project still has %(num)s card — delete it first."
 msgid_plural "This print project still has %(num)s cards — delete them first."
 msgstr[0] ""
 msgstr[1] ""
 
-#: app.py:764
+#: app.py:797
 msgid "Print project deleted."
 msgstr ""
 
-#: app.py:781
+#: app.py:814
 msgid "The cover must be a PNG, JPEG, WebP or GIF image."
 msgstr ""
 
-#: app.py:785
+#: app.py:818
 msgid "The uploaded cover could not be read."
 msgstr ""
 
-#: app.py:787
+#: app.py:820
 msgid "The uploaded cover is empty."
 msgstr ""
 
-#: app.py:789
+#: app.py:822
 msgid "The uploaded cover is too large (limit is 10 MB)."
 msgstr ""
 
-#: app.py:854
+#: app.py:889
 msgid "Please tick the ESPuinos this card should work on."
 msgstr ""
 
-#: app.py:863
+#: app.py:898
 msgid ""
 "No cover found for this card — neither beside the media nor inside it. "
 "Upload an image to print it with."
 msgstr ""
 
-#: app.py:881
+#: app.py:916
 #, python-format
 msgid "The card was not created at the print shop: %(error)s"
 msgstr ""
 
-#: app.py:895
+#: app.py:930
 #, python-format
 msgid "Card %(num)s created: it is at the print shop, and ready here."
 msgstr ""
 
-#: app.py:1026
+#: app.py:1061
 msgid "Recursion depth must be between 0 and 20."
 msgstr ""
 
-#: app.py:1029
+#: app.py:1064
 msgid "Settings saved."
 msgstr ""
 
-#: app.py:1039
+#: app.py:1074
 msgid "Please enter a password."
 msgstr ""
 
-#: app.py:1041
+#: app.py:1076
 msgid "Passwords do not match."
 msgstr ""
 
-#: app.py:1044
+#: app.py:1079
 msgid "Hub password set."
 msgstr ""
 
-#: app.py:1052
+#: app.py:1087
 msgid "Hub password removed."
 msgstr ""
 
@@ -606,7 +613,7 @@ msgid "Last seen"
 msgstr ""
 
 #: templates/cards.html:94 templates/media.html:33
-#: templates/print_project.html:91
+#: templates/print_project.html:96
 msgid "in print"
 msgstr ""
 
@@ -618,11 +625,11 @@ msgstr ""
 msgid "pending"
 msgstr ""
 
-#: templates/cards.html:115 templates/print_project.html:96
+#: templates/cards.html:115 templates/print_project.html:101
 msgid "Assign"
 msgstr ""
 
-#: templates/cards.html:115 templates/print_project.html:96
+#: templates/cards.html:115 templates/print_project.html:101
 msgid "Edit"
 msgstr ""
 
@@ -916,7 +923,7 @@ msgstr ""
 msgid "No card in this project yet."
 msgstr ""
 
-#: templates/print_project.html:89
+#: templates/print_project.html:94
 msgid "printed"
 msgstr ""
 

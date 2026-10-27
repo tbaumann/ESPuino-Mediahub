@@ -223,6 +223,7 @@ r = client.get("/health")
 check("health", r.status_code == 200 and r.get_json()["status"] == "ok")
 
 UID_A = "111111111111"
+PRINTED_UID = "555555555555"  # the UID the print process reports in section 10
 r = manifest("esp-a", UID_A)
 check("unknown tap registers pending + 404", r.status_code == 404 and r.get_json()["error"] == "unknown_card")
 check("pending record exists", cards_raw().get(f"esp-a/{UID_A}", {}).get("status") == "pending")
@@ -524,7 +525,7 @@ check("the card was written to the shop once, at the project's next id",
 check("...with no credential", puts[0][2] is None)
 body = ShopStub.last_body
 check("...as multipart carrying a name derived from the media",
-      b'name="name"' in body and b"Printed" in body)
+      b'name="name"\r\n\r\nPrinted\r\n' in body)
 check("...and the cover as the image part",
       b'name="image"; filename="cover.png"' in body and b"image/png" in body and png in body)
 check("...and no back side, which is the customer's choice at the shop", b'name="back"' not in body)
@@ -540,6 +541,7 @@ check("the hub holds one card per ticked device, under one identity",
       len(card_keys) == 2 and len(identities) == 1 and list(identities)[0].startswith("pending-"))
 record = raw[card_keys[0]]
 check("...assigned, with no UID yet", record["status"] == "assigned" and record["card_id"] is None)
+check("...under the same name the card has at the shop", record["name"] == "Printed")
 check("...carrying the print order", record["print"]["prefix"] == shop_project["prefix"])
 check("the project counts both records", store.count_cards_for_print_project(shop_token) == 2)
 check("and its card counter moved on", store.get_print_project(shop_token)["next_shop_card_id"] == 2)
@@ -635,7 +637,76 @@ check("...and the project refuses to be deleted while it holds cards",
       client.post(f"/print/{shop_token}/delete", follow_redirects=True).status_code == 200
       and store.get_print_project(shop_token) is not None)
 
-print("\n== 10. an existing db.json without the new key ==")
+print("\n== 10. the UID arrives ==")
+
+# The card the hub created in section 9 is card 1 at the shop, and no UID is known
+# for it anywhere yet.
+raw = cards_raw()
+virtual = {
+    key: card
+    for key, card in raw.items()
+    if (card.get("print") or {}).get("id") == 1 and card["card_id"] is None
+}
+identities = {store_lib.split_card_key(key, card) for key, card in virtual.items()}
+check("the hub holds the order's card under a virtual id for both devices",
+      len(virtual) == 2 and len(identities) == 1 and list(identities)[0].startswith("pending-"))
+check("...on the two devices the card was made for",
+      sorted(key.split("/")[0] for key in virtual) == ["esp-a", "esp-b"])
+
+# One of those devices already has the printed card in hand and taps it before
+# anybody has synced.
+manifest("esp-b", PRINTED_UID)
+check("a tap on the printed card registers itself at the UID",
+      cards_raw()[f"esp-b/{PRINTED_UID}"]["status"] == "pending")
+
+# The print process reports the UID it read off the chip.
+ShopStub.cards[0]["serial_number"] = PRINTED_UID
+r = client.post(f"/print/{shop_token}/sync", follow_redirects=True)
+check("the sync says the cards are printed now",
+      b"cards are printed and work here now" in r.data)
+raw = cards_raw()
+check("every record of that card is re-keyed onto the UID",
+      sorted(key for key, card in raw.items() if card["card_id"] == PRINTED_UID)
+      == [f"esp-a/{PRINTED_UID}", f"esp-b/{PRINTED_UID}"])
+_left = [
+    key
+    for key, card in raw.items()
+    if card["card_id"] is None and (card.get("print") or {}).get("id") == 1
+]
+check("nothing is left of that card under a virtual id", not _left, f"left={_left}")
+check("the tapped record took the assignment over",
+      raw[f"esp-b/{PRINTED_UID}"]["status"] == "assigned"
+      and len(raw[f"esp-b/{PRINTED_UID}"]["files"]) == 2)
+_other = raw[f"esp-a/{PRINTED_UID}"]
+check("the other device's record kept the same assignment",
+      _other["name"] == "Printed" and len(_other["files"]) == 2,
+      f"name={_other['name']!r} files={len(_other['files'])}")
+check("and both stay traceable to the order they came from",
+      all(raw[key]["print"]["token"] == shop_token and raw[key]["print"]["promoted_at"]
+          for key in (f"esp-a/{PRINTED_UID}", f"esp-b/{PRINTED_UID}")))
+r = manifest("esp-a", PRINTED_UID)
+check("the printed card serves the device right away",
+      r.status_code == 200 and r.get_json()["cardId"] == PRINTED_UID)
+r = client.get(f"/print/{shop_token}")
+check("the project page shows it as printed, with its UID",
+      PRINTED_UID.encode() in r.data)
+check("...and it is on the card list", PRINTED_UID.encode() in client.get("/cards").data)
+
+# A serial number the hub would not key a card by is left where it is: nothing is
+# gained by putting a value there that a device could never report.
+ShopStub.cards.append({"id": 2, "name": "Second", "serial_number": "12345", "back": "none"})
+r = client.post(f"/print/{shop_token}/sync", follow_redirects=True)
+check("a serial number that is not a card id promotes nothing",
+      b"works here now" not in r.data and b"Order at the print shop: paid" in r.data)
+check("...and nothing was keyed by it", not [key for key in cards_raw() if key.endswith("12345")])
+
+keys_before = sorted(cards_raw())
+r = client.post(f"/print/{shop_token}/sync", follow_redirects=True)
+check("a sync with nothing new to promote reports only the order",
+      b"works here now" not in r.data and b"Order at the print shop: paid" in r.data)
+check("...and changes nothing", sorted(cards_raw()) == keys_before)
+
+print("\n== 11. an existing db.json without the new key ==")
 old_install = os.path.join(ROOT, "old-install")
 os.makedirs(old_install, exist_ok=True)
 with open(os.path.join(old_install, "db.json"), "w", encoding="utf-8") as f:

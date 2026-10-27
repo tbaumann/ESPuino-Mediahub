@@ -650,18 +650,38 @@ def print_projects():
 def _read_order_into(token, project):
     """Asks the print shop about this project's order and stores what it says.
 
-    Returns the error to show the admin, or None when the shop answered. The status
-    is the shop's own vocabulary and is never interpreted here.
+    Returns `(error, promoted)`: the error to show the admin — None when the shop
+    answered — and how many hub cards the answer turned into real ones. The status is
+    the shop's own vocabulary and is never interpreted here.
+
+    A card's `serial_number` is the UID the print process read off the chip, so a
+    card that has one is the card a device now holds, and the assignment made for it
+    before printing moves onto that number here. This is the only place that happens:
+    a tap cannot do it, because the hub would have to ask the shop on a device's
+    request, and the button on the project page is what does the asking.
 
     `token` is passed alongside the record because the record does not carry its own
     key — the store keys projects by it, and a second copy could disagree with it.
     """
     try:
         order = printer_client.get_order(project["prefix"])
+        cards = printer_client.list_cards(project["prefix"])
     except printer_client.PrinterError as exc:
-        return str(exc)
+        return str(exc), 0
     store.set_print_project_status(token, order.get("status"))
-    return None
+
+    ts = store_lib.now_iso()
+    promoted = 0
+    for card in cards:
+        uid = str(card.get("serial_number") or "").strip()
+        if not manifest_lib.is_valid_card_id(uid):
+            # Not something this hub keys a card by. The field is written by the
+            # print process alone, so this is not distrust: it is that the whole
+            # record is keyed by the card id, and a value that is not one would
+            # produce a card the ESPuino could never report.
+            continue
+        promoted += store.promote_print_card({"token": token, "id": card.get("id")}, uid, ts)
+    return None, promoted
 
 
 @app.route("/print/new", methods=["POST"])
@@ -696,12 +716,25 @@ def sync_print_project(token):
     project = store.get_print_project(token)
     if project is None:
         abort(404)
-    error = _read_order_into(token, project)
+    error, promoted = _read_order_into(token, project)
     if error:
         flash(_("The print shop could not be read: %(error)s", error=error), "error")
-    else:
-        status = (store.get_print_project(token) or {}).get("status") or ""
-        flash(_("Order at the print shop: %(status)s", status=status), "success")
+        return redirect(url_for("print_project", token=token))
+    status = (store.get_print_project(token) or {}).get("status") or ""
+    flash(_("Order at the print shop: %(status)s", status=status), "success")
+    if promoted:
+        # The cards themselves are on the page below, under Printed — this only says
+        # that something changed, since a check that promotes nothing looks the same
+        # as one that was never run.
+        flash(
+            ngettext(
+                "%(num)s card is printed and works here now.",
+                "%(num)s cards are printed and work here now.",
+                promoted,
+            )
+            % {"num": promoted},
+            "success",
+        )
     return redirect(url_for("print_project", token=token))
 
 
@@ -801,12 +834,14 @@ def _selected_devices(known):
 
 
 def _card_name(payload, shop_card_id):
-    """A name for the card at the shop: the admin's, or one derived from the media.
+    """The card's name: the admin's, or one derived from the media.
 
     The service requires a non-empty name, while a hub card's name is optional
     ("display/logs only" here), so an unnamed card is named after the folder or the
-    file it plays — and only then after its number. Not translated: this is a card's
-    name at another service, not hub UI text.
+    file it plays — and only then after its number. The same name is then used on
+    this side too: one card, one name, rather than the same card appearing unnamed
+    in the hub and named at the shop. Not translated: this is a card's name, not hub
+    UI text.
     """
     name, _kind, _play_mode, _stream_url, files, play_root = payload
     if name:
@@ -868,10 +903,10 @@ def new_print_card(token):
             return _print_card_form(token, project, devices, request.form)
 
         shop_card_id = store.allocate_shop_card_id(token)
+        name = _card_name(payload, shop_card_id)
+        payload = (name,) + payload[1:]
         try:
-            printer_client.put_card(
-                project["prefix"], shop_card_id, _card_name(payload, shop_card_id), cover
-            )
+            printer_client.put_card(project["prefix"], shop_card_id, name, cover)
         except printer_client.PrinterError as exc:
             # Nothing was written on this side either, so the card can be submitted
             # again: the shop id was consumed, but the ids are the hub's to pick and
