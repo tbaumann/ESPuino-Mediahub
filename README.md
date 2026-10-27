@@ -55,6 +55,17 @@ pip install -r requirements.txt
 python app.py        # http://localhost:8080
 ```
 
+Or straight from the flake, without installing anything:
+
+```bash
+MEDIAHUB_DATA=$HOME/mediahub-data MEDIAHUB_MEDIA=$HOME/audiobooks nix run .
+# http://localhost:8000  (gunicorn's own default; the image passes --bind 0.0.0.0:8080)
+```
+
+Both paths have to be **absolute**: the wrapped gunicorn starts with `--chdir` into
+the read-only store path it was built into, so a relative `./data` would be looked
+for there.
+
 ## Updating
 
 ```bash

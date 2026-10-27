@@ -716,6 +716,17 @@ check("reading projects from an old db is empty, not a crash", legacy.list_print
 check("and a project can still be created", legacy.create_print_project("Neu")["name"] == "Neu")
 check("...landing in the file", list(legacy.list_print_projects().values())[0]["prefix"])
 
+print("\n== 12. an unusable data directory says why ==")
+blocker = os.path.join(ROOT, "not-a-directory")
+with open(blocker, "w", encoding="utf-8") as f:
+    f.write("x")
+try:
+    store_lib.Store(os.path.join(blocker, "data"))
+    check("a data directory that cannot be created names the fix", False, "no error raised")
+except RuntimeError as exc:
+    check("a data directory that cannot be created names the fix",
+          "cannot write to the data directory" in str(exc), str(exc))
+
 shutil.rmtree(ROOT, ignore_errors=True)
 print("\n" + ("ALL CHECKS PASSED" if not FAILED else f"{len(FAILED)} FAILED: {FAILED}"))
 sys.exit(1 if FAILED else 0)

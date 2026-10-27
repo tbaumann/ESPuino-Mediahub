@@ -109,19 +109,21 @@ class Store:
         try:
             os.makedirs(data_dir, exist_ok=True)
             self._ensure_db()
-        except PermissionError as exc:
-            # The one setup mistake that costs people the most time: Docker
-            # creates a missing bind-mount path as root, while the service runs
-            # as another uid. Without this, every worker dies inside
-            # _ensure_db() with a bare traceback and the container
-            # restart-loops, with nothing in the log that names the cause.
-            # entrypoint.sh catches it before Python even starts; this covers a
-            # run without the entrypoint, and a directory that stops being
-            # writable later on.
+        except OSError as exc:
+            # The two setup mistakes that cost people the most time, and both look
+            # the same from inside a worker: Docker creates a missing bind-mount
+            # path as root while the service runs as another uid, and a *relative*
+            # path is resolved against the working directory — which for the
+            # packaged app is the read-only store path gunicorn chdir'd into.
+            # Without this, every worker dies inside _ensure_db() with a bare
+            # traceback and the container restart-loops, with nothing in the log
+            # that names the cause. entrypoint.sh catches it before Python even
+            # starts; this covers a run without the entrypoint, and a directory
+            # that stops being writable later on.
             raise RuntimeError(
                 f"cannot write to the data directory {data_dir!r} as uid {os.geteuid()} "
-                f"({exc.strerror}) - on the host: "
-                f"chown -R {os.geteuid()}:{os.getegid()} <that directory>"
+                f"({exc.strerror}) - it has to be an absolute path this user owns "
+                f"(on the host: chown -R {os.geteuid()}:{os.getegid()} <that directory>)"
             ) from exc
 
     def _ensure_db(self):
