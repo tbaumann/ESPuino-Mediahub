@@ -48,7 +48,7 @@ in
       mkdir -p $out/share/espuino-mediahub
       cp -r \
         app.py cover_art.py espuino_client.py manifest.py media_library.py \
-        printer_client.py store.py \
+        print_back.py printer_client.py store.py \
         templates static translations babel.cfg messages.pot \
         $out/share/espuino-mediahub/
       mkdir -p $out/bin

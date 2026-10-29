@@ -28,6 +28,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 import cover_art
 import manifest as manifest_lib
 import media_library
+import print_back
 import printer_client
 import store as store_lib
 from espuino_client import delete_rfid_on_device
@@ -906,7 +907,17 @@ def new_print_card(token):
         name = _card_name(payload, shop_card_id)
         payload = (name,) + payload[1:]
         try:
-            printer_client.put_card(project["prefix"], shop_card_id, name, cover)
+            # The track list rides along as the card's back text, and no back side
+            # with it: a back spends a ribbon panel, so which one the card gets
+            # stays the customer's choice at the shop — the list is simply there
+            # when he picks a markdown back.
+            printer_client.put_card(
+                project["prefix"],
+                shop_card_id,
+                name,
+                cover,
+                back_text=print_back.markdown_for(payload),
+            )
         except printer_client.PrinterError as exc:
             # Nothing was written on this side either, so the card can be submitted
             # again: the shop id was consumed, but the ids are the hub's to pick and

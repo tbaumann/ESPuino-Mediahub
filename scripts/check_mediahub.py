@@ -531,6 +531,33 @@ check("...as multipart carrying a name derived from the media",
 check("...and the cover as the image part",
       b'name="image"; filename="cover.png"' in body and b"image/png" in body and png in body)
 check("...and no back side, which is the customer's choice at the shop", b'name="back"' not in body)
+check("...and the track list as the card's back text",
+      b'name="back_text"' in body and b"**All tracks of a folder (sorted)**\n\n- 01\n- 02" in body)
+
+# The text itself, independent of the scratch library's two by-two files: the play
+# mode as its own line and one bullet per track, named as a listener reads it —
+# no folder prefix, no extension.
+check(
+    "the back text is the play mode and the tracks",
+    mediahub.print_back.markdown_for(
+        (
+            "Bobo",
+            "files",
+            5,
+            None,
+            [{"path": "Bobo/01 - Intro.mp3"}, {"path": "Bobo/02 - Kapitel 1.mp3"}],
+            "Bobo",
+        )
+    )
+    == "**All tracks of a folder (sorted)**\n\n- 01 - Intro\n- 02 - Kapitel 1",
+)
+check(
+    "a webradio card's back text is the stream",
+    mediahub.print_back.markdown_for(
+        ("Radio", "webradio", None, "http://radio.example/stream.mp3", [], "")
+    )
+    == "**Webradio**\n\n- http://radio.example/stream.mp3",
+)
 
 raw = cards_raw()
 card_keys = [
@@ -635,6 +662,9 @@ r = client.post(
 puts = [call for call in ShopStub.calls[calls_before:] if call[0] == "PUT"]
 check("a webradio card is created with an uploaded cover",
       len(puts) == 1 and b'name="name"' in ShopStub.last_body and b"Radio" in ShopStub.last_body)
+check("...with the stream as its back text, and still no back side",
+      b"- http://radio.example/stream.mp3" in ShopStub.last_body
+      and b'name="back"' not in ShopStub.last_body)
 check("...and the project refuses to be deleted while it holds cards",
       client.post(f"/print/{shop_token}/delete", follow_redirects=True).status_code == 200
       and store.get_print_project(shop_token) is not None)

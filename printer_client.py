@@ -105,6 +105,11 @@ def put_card(prefix, shop_card_id, name, image, back=None, back_text=None):
     card's front, i.e. its cover. No back side is ever sent: a back spends a ribbon
     panel, so which one a card gets is the customer's choice on the shop's page,
     not something the hub picks on his behalf.
+
+    `back_text` rides along without a back side, and the service stores it: it is
+    the markdown a `markdown` back is rendered from, so the customer finds the
+    track list already in the card when he picks that back — to keep, shorten or
+    throw away. Until he does, nothing renders it.
     """
     fields = {"name": name}
     if back:
