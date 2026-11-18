@@ -24,6 +24,7 @@ from flask_babel import Babel, get_locale, gettext as _, ngettext
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
+import api
 import manifest as manifest_lib
 import media_library
 import store as store_lib
@@ -100,10 +101,16 @@ def set_language(lang_code):
 # --------------------------------------------------------------------------
 PUBLIC_ENDPOINTS = {"login", "set_language", "health", "card_manifest", "serve_media", "static"}
 
+# The API is "public" in that same sense — a client has no browser session, so
+# the hub password must not send it to a login page. It brings its own auth
+# instead: a shared secret, checked by the blueprint itself (see api.py), which
+# is also why these endpoints stay reachable while the UI asks for a password.
+API_ENDPOINTS = {"api.info", "api.devices", "api.cards", "api.assign_card"}
+
 
 @app.before_request
 def _require_login():
-    if request.endpoint in PUBLIC_ENDPOINTS or request.endpoint is None:
+    if request.endpoint in PUBLIC_ENDPOINTS or request.endpoint in API_ENDPOINTS or request.endpoint is None:
         return
     if store.get_settings().get("password_hash") and not session.get("authenticated"):
         return redirect(url_for("login", next=request.path))
@@ -717,6 +724,11 @@ def card_manifest(esp_id, card_id):
 @app.route("/media/<path:filename>")
 def serve_media(filename):
     return send_from_directory(MEDIA_DIR, filename)
+
+
+# Registered last: the API reuses the hub's own validation and store, so both
+# have to exist before it can be wired in. See api.py and docs/api.md.
+app.register_blueprint(api.build(store=store, read_assignment=_read_assignment))
 
 
 if __name__ == "__main__":

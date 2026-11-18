@@ -20,6 +20,11 @@ services:
     environment:
       - MEDIAHUB_DATA=/data
       - MEDIAHUB_MEDIA=/media
+      # The shared secret for the API under /api/ (see docs/api.md). Empty, or
+      # missing, means the hub serves no API at all - which is the default,
+      # since an unauthenticated write endpoint on a household LAN is worse
+      # than a missing one.
+      - MEDIAHUB_API_SECRET=${MEDIAHUB_API_SECRET:-}
       # The service runs as www-data (33:33) by default, not as root: the
       # container starts as root only so entrypoint.sh can hand /data to this
       # uid/gid, and then steps down to it. So there is no chown to do by hand.

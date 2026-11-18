@@ -98,6 +98,7 @@ compose up -d` takes over from `--build` and nothing else changes.
 - **Media** (`/media`): storage usage per card; `/media/browse?path=` is the JSON API backing the tree browser.
 - **Settings** (`/settings`): delete behavior lazy vs. secure (concept §13.1) — secure calls `DELETE /rfid` on the ESPuino and only removes the hub entry after a confirmed 200 response. Recursion depth for "use folder". Which devices an assignment pre-selects (only the one being edited, or all known ESPuinos) — a pre-selection only, never what gets written. Also: set/remove the optional hub password.
 - **MediaHub API**: `GET /<espId>/card/<cardId>/manifest.json` (manifest, or `pending` registration), `GET /media/<path>` (media files, path relative to the library root).
+- **API for tools** (`/api`): the same hub, driven by a program instead of a browser — `GET /api/info`, `GET /api/devices`, `GET /api/cards` (filterable by device and status) and `POST /api/cards/<espId>/<cardId>`, which answers the card it wrote plus the paths it had to drop. It validates with the assignment form's own rule and writes one device per call; a card the hub has never seen is created by that write, which is the ordinary case for a card a device has just reported. Auth is a shared secret in `MEDIAHUB_API_SECRET` (empty means no API is served), carried as `Authorization: Bearer <secret>`; the optional UI password does not apply here. The full surface is in [`docs/api.md`](docs/api.md).
 
 ## Maintaining translations
 
