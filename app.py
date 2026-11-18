@@ -397,6 +397,95 @@ def duplicate_card(esp_id, card_id):
     return redirect(url_for("cards"))
 
 
+def _read_assignment(form):
+    """The assignment a card form carries, validated: `(payload, error, warning)`.
+
+    Both the assignment form and the API end in the same `save_assignment`
+    call, so both read their content through this function — a rule only one of
+    them applied would be a bug in whichever one an operator happened to use.
+
+    `payload` is the six fields `save_assignment` takes after the card's
+    identity. `error` is fatal (nothing may be written) and `warning` is not
+    (the assignment is usable, something was skipped); either, both or neither
+    may be set, and a warning is returned alongside an error instead of being
+    reported here, so a caller cannot lose it.
+    """
+    name = form.get("name", "").strip()
+    kind = form.get("kind", "files")
+
+    if kind == "webradio":
+        stream_url = form.get("stream_url", "").strip()
+        if not stream_url:
+            return None, _("A stream URL is required for webradio."), None
+        return (name, "webradio", None, stream_url, [], ""), None, None
+
+    try:
+        play_mode = int(form.get("play_mode", ""))
+    except ValueError:
+        play_mode = -1
+    if not manifest_lib.is_valid_file_play_mode(play_mode):
+        return None, _("Please choose a valid play mode."), None
+
+    try:
+        selected_paths = json.loads(form.get("selected_paths_json", "[]"))
+    except ValueError:
+        selected_paths = []
+
+    files, missing = [], []
+    for relpath in selected_paths:
+        info = media_library.stat_and_hash(MEDIA_DIR, relpath)
+        if info is None:
+            missing.append(relpath)
+        else:
+            files.append(info)
+
+    warning = None
+    if missing:
+        warning = _(
+            "Some selected files could not be used (missing, or not "
+            "readable by the container's user) and were skipped: "
+            "%(paths)s",
+            paths=", ".join(missing),
+        )
+
+    if not files:
+        return None, _("At least one audio file is required."), warning
+
+    if play_mode in manifest_lib.SINGLE_FILE_PLAY_MODES and len(files) > 1:
+        return (
+            None,
+            _("This play mode only supports a single file — please select just one."),
+            warning,
+        )
+
+    # The ESPuino is handed a folder, not a file list (see
+    # SINGLE_FOLDER_PLAY_MODES): with files from several folders these modes
+    # find nothing to play at all. The browser already refuses the
+    # combination, but a form can be submitted without it.
+    folders = {posixpath.dirname(f["path"]) for f in files}
+    if play_mode in manifest_lib.SINGLE_FOLDER_PLAY_MODES and len(folders) > 1:
+        return (
+            None,
+            _(
+                "This play mode plays a single folder, but the selected files "
+                "lie in %(num)s different ones. Choose a recursive play mode, "
+                "or pick files from one folder only.",
+                num=len(folders),
+            ),
+            warning,
+        )
+
+    files.sort(key=lambda f: f["path"])
+    # The folder "use folder" was applied to, if that is how the selection
+    # came about. Validated against the library rather than trusted: it is a
+    # hidden form field, and it ends up in the manifest as the folder an
+    # ESPuino will play.
+    play_root = (form.get("play_root") or "").strip().strip("/").strip()
+    if play_root and media_library.list_directory(MEDIA_DIR, play_root) is None:
+        play_root = ""
+    return (name, "files", play_mode, None, files, play_root), None, warning
+
+
 @app.route("/cards/<esp_id>/<card_id>/assign", methods=["GET", "POST"])
 def assign_card(esp_id, card_id):
     card = store.get_card(esp_id, card_id) or {
@@ -411,82 +500,14 @@ def assign_card(esp_id, card_id):
     }
 
     if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        kind = request.form.get("kind", "files")
-
-        if kind == "webradio":
-            stream_url = request.form.get("stream_url", "").strip()
-            if not stream_url:
-                flash(_("A stream URL is required for webradio."), "error")
-                return redirect(url_for("assign_card", esp_id=esp_id, card_id=card_id))
-            payload = (name, "webradio", None, stream_url, [], "")
-        else:
-            try:
-                play_mode = int(request.form.get("play_mode", ""))
-            except ValueError:
-                play_mode = -1
-            if not manifest_lib.is_valid_file_play_mode(play_mode):
-                flash(_("Please choose a valid play mode."), "error")
-                return redirect(url_for("assign_card", esp_id=esp_id, card_id=card_id))
-
-            try:
-                selected_paths = json.loads(request.form.get("selected_paths_json", "[]"))
-            except ValueError:
-                selected_paths = []
-
-            files, missing = [], []
-            for relpath in selected_paths:
-                info = media_library.stat_and_hash(MEDIA_DIR, relpath)
-                if info is None:
-                    missing.append(relpath)
-                else:
-                    files.append(info)
-
-            if missing:
-                flash(
-                    _(
-                        "Some selected files could not be used (missing, or not "
-                        "readable by the container's user) and were skipped: "
-                        "%(paths)s",
-                        paths=", ".join(missing),
-                    ),
-                    "error",
-                )
-
-            if not files:
-                flash(_("At least one audio file is required."), "error")
-                return redirect(url_for("assign_card", esp_id=esp_id, card_id=card_id))
-
-            if play_mode in manifest_lib.SINGLE_FILE_PLAY_MODES and len(files) > 1:
-                flash(_("This play mode only supports a single file — please select just one."), "error")
-                return redirect(url_for("assign_card", esp_id=esp_id, card_id=card_id))
-
-            # The ESPuino is handed a folder, not a file list (see
-            # SINGLE_FOLDER_PLAY_MODES): with files from several folders these
-            # modes find nothing to play at all. The browser already refuses
-            # the combination, but a form can be submitted without it.
-            folders = {posixpath.dirname(f["path"]) for f in files}
-            if play_mode in manifest_lib.SINGLE_FOLDER_PLAY_MODES and len(folders) > 1:
-                flash(
-                    _(
-                        "This play mode plays a single folder, but the selected files "
-                        "lie in %(num)s different ones. Choose a recursive play mode, "
-                        "or pick files from one folder only.",
-                        num=len(folders),
-                    ),
-                    "error",
-                )
-                return redirect(url_for("assign_card", esp_id=esp_id, card_id=card_id))
-
-            files.sort(key=lambda f: f["path"])
-            # The folder "use folder" was applied to, if that is how the
-            # selection came about. Validated against the library rather than
-            # trusted: it is a hidden form field, and it ends up in the
-            # manifest as the folder an ESPuino will play.
-            play_root = (request.form.get("play_root") or "").strip().strip("/").strip()
-            if play_root and media_library.list_directory(MEDIA_DIR, play_root) is None:
-                play_root = ""
-            payload = (name, "files", play_mode, None, files, play_root)
+        payload, error, warning = _read_assignment(request.form)
+        if warning:
+            # Not fatal: the rest of the selection is usable, and the admin is
+            # told what was dropped rather than losing the whole form over it.
+            flash(warning, "error")
+        if payload is None:
+            flash(error, "error")
+            return redirect(url_for("assign_card", esp_id=esp_id, card_id=card_id))
 
         # Same content, one independent assignment per device — the ESPuinos
         # keep their own play positions and caches.
